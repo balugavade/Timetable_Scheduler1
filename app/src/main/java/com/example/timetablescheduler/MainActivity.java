@@ -48,6 +48,12 @@ public class MainActivity extends AppCompatActivity {
             return;
         }
 
+        // Regex to allow only rvce.edu.in emails
+        if (!email.matches("^[A-Za-z0-9._%+-]+@rvce\\.edu\\.in$")) {
+            showToast("Please enter a valid rvce.edu.in email address");
+            return;
+        }
+
         // Login with email by querying users
         ParseUser.logInInBackground(email, password, (user, e) -> {
             if (user != null) {

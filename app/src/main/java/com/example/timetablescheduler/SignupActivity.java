@@ -12,7 +12,7 @@ import com.parse.ParseUser;
 
 public class SignupActivity extends AppCompatActivity {
 
-    private EditText etUsername, etEmail, etPassword, etConfirmPassword;
+    private EditText etDisplayName, etEmail, etPassword, etConfirmPassword;
     private Button btnFinish;
 
     @Override
@@ -20,7 +20,7 @@ public class SignupActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_signup);
 
-        etUsername = findViewById(R.id.editTextText3);
+        etDisplayName = findViewById(R.id.editTextText3);
         etEmail = findViewById(R.id.editTextText4);
         etPassword = findViewById(R.id.editTextText5);
         etConfirmPassword = findViewById(R.id.editTextText6);
@@ -30,12 +30,12 @@ public class SignupActivity extends AppCompatActivity {
     }
 
     private void handleSignup() {
-        String username = etUsername.getText().toString().trim();
+        String displayName = etDisplayName.getText().toString().trim();
         String email = etEmail.getText().toString().trim();
         String password = etPassword.getText().toString().trim();
         String confirmPassword = etConfirmPassword.getText().toString().trim();
 
-        if (username.isEmpty() || email.isEmpty() || password.isEmpty()) {
+        if (displayName.isEmpty() || email.isEmpty() || password.isEmpty()) {
             showToast("All fields are required");
             return;
         }
@@ -45,17 +45,22 @@ public class SignupActivity extends AppCompatActivity {
             return;
         }
 
+        // Optional: Only allow rvce.edu.in emails
+        // if (!email.matches("^[A-Za-z0-9._%+-]+@rvce\\.edu\\.in$")) {
+        //     showToast("Please use your rvce.edu.in email address");
+        //     return;
+        // }
+
         ParseUser user = new ParseUser();
-        user.setUsername(username);
+        user.setUsername(email); // Use email as unique username
         user.setEmail(email);
         user.setPassword(password);
+        user.put("displayName", displayName); // Custom field for display name
 
         user.signUpInBackground(e -> {
             if (e == null) {
-                // Log out the user immediately after signup
-                ParseUser.logOut();
-
-                showToast("Signup successful! Please login");
+                ParseUser.logOut(); // Log out after signup so user can login manually
+                showToast("Signup successful! Please login.");
                 startActivity(new Intent(this, MainActivity.class));
                 finish();
             } else {

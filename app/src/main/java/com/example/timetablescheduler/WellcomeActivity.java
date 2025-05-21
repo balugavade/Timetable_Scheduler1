@@ -36,8 +36,8 @@ public class WellcomeActivity extends AppCompatActivity {
         Button logoutButton = findViewById(R.id.button);
 
         if (currentUser != null) {
-            String username = currentUser.getUsername();
-            welcomeText.setText("Welcome, " + username + "!");
+            String displayName = currentUser.getString("displayName");
+            welcomeText.setText("Welcome, " + displayName + "!");
         } else {
             // No user, go back to login
             Intent intent = new Intent(WellcomeActivity.this, MainActivity.class);
