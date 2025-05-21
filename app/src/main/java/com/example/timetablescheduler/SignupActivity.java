@@ -1,56 +1,47 @@
 package com.example.timetablescheduler;
 
-import android.os.Bundle;
+import android.content.Intent;
 import android.os.Bundle;
 import android.widget.Button;
 import android.widget.EditText;
-import android.widget.TextView;
 import android.widget.Toast;
-import androidx.appcompat.app.AppCompatActivity;
-import com.parse.LogInCallback;
-import com.parse.ParseException;
-import com.parse.ParseQuery;
-import com.parse.ParseUser;
-import java.util.List;
 
-import androidx.activity.EdgeToEdge;
 import androidx.appcompat.app.AppCompatActivity;
-import androidx.core.graphics.Insets;
-import androidx.core.view.ViewCompat;
-import androidx.core.view.WindowInsetsCompat;
+
+import com.parse.ParseUser;
 
 public class SignupActivity extends AppCompatActivity {
 
     private EditText etUsername, etEmail, etPassword, etConfirmPassword;
+    private Button btnFinish;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        EdgeToEdge.enable(this);
         setContentView(R.layout.activity_signup);
 
         etUsername = findViewById(R.id.editTextText3);
         etEmail = findViewById(R.id.editTextText4);
         etPassword = findViewById(R.id.editTextText5);
         etConfirmPassword = findViewById(R.id.editTextText6);
-        Button btnSignup = findViewById(R.id.button3);
+        btnFinish = findViewById(R.id.button3);
 
-        btnSignup.setOnClickListener(v -> signupUser());
+        btnFinish.setOnClickListener(v -> handleSignup());
     }
 
-    private void signupUser() {
+    private void handleSignup() {
         String username = etUsername.getText().toString().trim();
         String email = etEmail.getText().toString().trim();
-        String password = etPassword.getText().toString();
-        String confirmPassword = etConfirmPassword.getText().toString();
+        String password = etPassword.getText().toString().trim();
+        String confirmPassword = etConfirmPassword.getText().toString().trim();
 
         if (username.isEmpty() || email.isEmpty() || password.isEmpty()) {
-            Toast.makeText(this, "All fields are required", Toast.LENGTH_SHORT).show();
+            showToast("All fields are required");
             return;
         }
 
         if (!password.equals(confirmPassword)) {
-            Toast.makeText(this, "Passwords do not match", Toast.LENGTH_SHORT).show();
+            showToast("Passwords do not match");
             return;
         }
 
@@ -61,18 +52,19 @@ public class SignupActivity extends AppCompatActivity {
 
         user.signUpInBackground(e -> {
             if (e == null) {
-                Toast.makeText(SignupActivity.this, "Account created!", Toast.LENGTH_SHORT).show();
-                finish(); // Return to login screen
+                // Log out the user immediately after signup
+                ParseUser.logOut();
+
+                showToast("Signup successful! Please login");
+                startActivity(new Intent(this, MainActivity.class));
+                finish();
             } else {
-                Toast.makeText(SignupActivity.this, "Error: " + e.getMessage(), Toast.LENGTH_LONG).show();
+                showToast("Signup failed: " + e.getMessage());
             }
         });
+    }
 
-
-        ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.main), (v, insets) -> {
-            Insets systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars());
-            v.setPadding(systemBars.left, systemBars.top, systemBars.right, systemBars.bottom);
-            return insets;
-        });
+    private void showToast(String message) {
+        Toast.makeText(this, message, Toast.LENGTH_SHORT).show();
     }
 }
