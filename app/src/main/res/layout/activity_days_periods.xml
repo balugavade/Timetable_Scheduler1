@@ -1,91 +1,132 @@
 <?xml version="1.0" encoding="utf-8"?>
-<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent">
 
-    <LinearLayout
-        android:orientation="vertical"
-        android:padding="16dp"
+    <!-- Scrollable content -->
+    <ScrollView
+        android:id="@+id/scrollView"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content">
+        android:layout_height="match_parent"
+        android:layout_above="@+id/btnSaveTimetable"
+        android:fillViewport="true">
 
-        <EditText
-            android:id="@+id/etPeriodsPerDay"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:hint="Slots or Periods of study (per day)"
-            android:inputType="number" />
-
-        <Button
-            android:id="@+id/btnGenerateRows"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Set Periods" />
-
-        <!-- Dynamic period rows will be added here -->
         <LinearLayout
-            android:id="@+id/layoutPeriodsContainer"
+            android:id="@+id/contentLayout"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
-            android:layout_marginTop="8dp"/>
+            android:padding="16dp">
 
-        <EditText
-            android:id="@+id/etBreakAfter"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:hint="Insert Break after period number (skip if no break)"
-            android:inputType="number" />
+            <!-- Periods -->
+            <EditText
+                android:id="@+id/etPeriodsPerDay"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="Slots or Periods of study (per day)"
+                android:inputType="number" />
 
+            <Button
+                android:id="@+id/btnGenerateRows"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Set Periods" />
 
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Select Days:"
-            android:layout_marginTop="12dp" />
+            <LinearLayout
+                android:id="@+id/layoutPeriodsContainer"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:layout_marginTop="8dp" />
 
-        <CheckBox
-            android:id="@+id/cbMonday"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Monday" />
-        <CheckBox
-            android:id="@+id/cbTuesday"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Tuesday" />
-        <CheckBox
-            android:id="@+id/cbWednesday"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Wednesday" />
-        <CheckBox
-            android:id="@+id/cbThursday"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Thursday" />
-        <CheckBox
-            android:id="@+id/cbFriday"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Friday" />
-        <CheckBox
-            android:id="@+id/cbSaturday"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Saturday" />
-        <CheckBox
-            android:id="@+id/cbSunday"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Sunday" />
+            <!-- Breaks -->
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Breaks"
+                android:textStyle="bold"
+                android:layout_marginTop="16dp" />
 
-        <Button
-            android:id="@+id/btnSaveTimetable"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="Save Timetable"
-            android:layout_marginTop="16dp" />
+            <EditText
+                android:id="@+id/etNumBreaks"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="Number of breaks in a day"
+                android:inputType="number" />
 
-    </LinearLayout>
-</ScrollView>
+            <Button
+                android:id="@+id/btnGenerateBreakRows"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Set Breaks" />
+
+            <LinearLayout
+                android:id="@+id/layoutBreaksContainer"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:layout_marginTop="8dp"/>
+
+            <!-- Days per week -->
+            <EditText
+                android:id="@+id/etDaysPerWeek"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="No. of days (per week)"
+                android:inputType="number" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Select Days:"
+                android:layout_marginTop="12dp" />
+
+            <CheckBox
+                android:id="@+id/cbMonday"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Monday" />
+            <CheckBox
+                android:id="@+id/cbTuesday"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Tuesday" />
+            <CheckBox
+                android:id="@+id/cbWednesday"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Wednesday" />
+            <CheckBox
+                android:id="@+id/cbThursday"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Thursday" />
+            <CheckBox
+                android:id="@+id/cbFriday"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Friday" />
+            <CheckBox
+                android:id="@+id/cbSaturday"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Saturday" />
+            <CheckBox
+                android:id="@+id/cbSunday"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Sunday" />
+
+        </LinearLayout>
+    </ScrollView>
+
+    <!-- Fixed button at the bottom -->
+    <Button
+        android:id="@+id/btnSaveTimetable"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Save Timetable"
+        android:layout_alignParentBottom="true"
+        android:layout_margin="8dp" />
+
+</RelativeLayout>
