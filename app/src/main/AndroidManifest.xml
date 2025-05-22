@@ -16,6 +16,9 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.TimetableScheduler">
         <activity
+            android:name=".TeachersActivity"
+            android:windowSoftInputMode="adjustResize" />
+        <activity
             android:name=".DaysPeriodsActivity"
             android:windowSoftInputMode="adjustResize" />
 

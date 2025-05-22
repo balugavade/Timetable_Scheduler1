@@ -1,5 +1,6 @@
 package com.example.timetablescheduler;
 
+import android.content.Intent;
 import android.os.Bundle;
 import android.text.InputType;
 import android.widget.*;
@@ -219,6 +220,9 @@ public class DaysPeriodsActivity extends AppCompatActivity {
             timetable.saveInBackground(e -> {
                 if (e == null) {
                     Toast.makeText(this, "Timetable saved!", Toast.LENGTH_SHORT).show();
+                    // Navigate to TeachersActivity after successful save
+                    Intent intent = new Intent(DaysPeriodsActivity.this, TeachersActivity.class);
+                    startActivity(intent);
                     finish();
                 } else {
                     Toast.makeText(this, "Error saving timetable: " + e.getMessage(), Toast.LENGTH_SHORT).show();

@@ -125,7 +125,7 @@
         android:id="@+id/btnSaveTimetable"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Save Timetable"
+        android:text="Save and Next"
         android:layout_alignParentBottom="true"
         android:layout_margin="8dp" />
 
