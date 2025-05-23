@@ -16,12 +16,17 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.TimetableScheduler">
         <activity
+            android:name=".TimetableGeneratorActivity"
+            android:exported="false" />
+        <activity
+            android:name=".BatchActivity"
+            android:exported="false" />
+        <activity
             android:name=".TeachersActivity"
             android:windowSoftInputMode="adjustResize" />
         <activity
             android:name=".DaysPeriodsActivity"
             android:windowSoftInputMode="adjustResize" />
-
         <activity
             android:name=".MainActivity"
             android:exported="true">

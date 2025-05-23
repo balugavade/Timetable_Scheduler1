@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <!-- Toolbar at the top -->
+    <androidx.appcompat.widget.Toolbar
+        android:id="@+id/toolbar"
+        android:layout_width="match_parent"
+        android:layout_height="?attr/actionBarSize"
+        android:background="?attr/colorPrimary"
+        android:theme="@style/ThemeOverlay.AppCompat.Dark.ActionBar"
+        android:elevation="4dp"/>
+
+    <ScrollView
+        android:id="@+id/scrollView"
+        android:layout_below="@id/toolbar"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:layout_above="@+id/btnNext"
+        android:fillViewport="true">
+
+        <LinearLayout
+            android:id="@+id/layoutBatchContent"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="16dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Batch Management"
+                android:textSize="20sp"
+                android:textStyle="bold"
+                android:layout_gravity="center"
+                android:layout_marginBottom="20dp"/>
+
+            <EditText
+                android:id="@+id/etNumBatches"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="No of Batches"
+                android:inputType="number"
+                android:layout_marginBottom="8dp"/>
+
+            <Button
+                android:id="@+id/btnSetBatches"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Set Batches"
+                android:layout_marginBottom="16dp"/>
+
+            <!-- Container for dynamically added batch fields -->
+            <LinearLayout
+                android:id="@+id/layoutBatchesContainer"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"/>
+
+        </LinearLayout>
+    </ScrollView>
+
+    <Button
+        android:id="@+id/btnNext"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Generate Timetable"
+        android:layout_alignParentBottom="true"
+        android:layout_margin="8dp"/>
+
+</RelativeLayout>

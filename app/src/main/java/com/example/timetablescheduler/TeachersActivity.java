@@ -3,7 +3,6 @@ package com.example.timetablescheduler;
 import android.content.Intent;
 import android.os.Bundle;
 import android.text.InputType;
-import android.util.Log;
 import android.view.View;
 import android.widget.*;
 import androidx.appcompat.app.AppCompatActivity;
@@ -14,148 +13,114 @@ import java.util.List;
 
 public class TeachersActivity extends AppCompatActivity {
 
-    private EditText etNumTeachers;
-    private Button btnGenerateTeacherFields, btnNext;
+    private Button btnAddTeacher, btnEditTeachers, btnNext;
     private LinearLayout layoutTeachersContainer;
-
-    // Lists to store dynamically created fields
-    private List<EditText> teacherNameEditTexts = new ArrayList<>();
-    private List<EditText> teacherSubjectEditTexts = new ArrayList<>();
+    private List<View> teacherViews = new ArrayList<>();
+    private boolean isEditMode = false;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_teachers);
 
-        etNumTeachers = findViewById(R.id.etNumTeachers);
-        btnGenerateTeacherFields = findViewById(R.id.btnGenerateTeacherFields);
+        btnAddTeacher = findViewById(R.id.btnAddTeacher);
+        btnEditTeachers = findViewById(R.id.btnEditTeachers);
         btnNext = findViewById(R.id.btnNext);
         layoutTeachersContainer = findViewById(R.id.layoutTeachersContainer);
 
-        btnGenerateTeacherFields.setOnClickListener(v -> generateTeacherFields());
+        btnAddTeacher.setOnClickListener(v -> addTeacherField(null, null));
+        btnEditTeachers.setOnClickListener(v -> toggleEditMode());
         btnNext.setOnClickListener(v -> saveTeachersToBack4App());
     }
 
-    private void generateTeacherFields() {
-        layoutTeachersContainer.removeAllViews();
-        teacherNameEditTexts.clear();
-        teacherSubjectEditTexts.clear();
+    private void addTeacherField(String name, String subject) {
+        LinearLayout row = new LinearLayout(this);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setLayoutParams(new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT));
+        row.setPadding(0, 8, 0, 8);
 
-        String numTeachersStr = etNumTeachers.getText().toString().trim();
-        if (numTeachersStr.isEmpty()) {
-            Toast.makeText(this, "Enter number of teachers", Toast.LENGTH_SHORT).show();
-            return;
+        EditText etName = new EditText(this);
+        etName.setLayoutParams(new LinearLayout.LayoutParams(0,
+                LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+        etName.setHint("Teacher Name");
+        etName.setInputType(InputType.TYPE_CLASS_TEXT);
+        if (name != null) etName.setText(name);
+
+        EditText etSubject = new EditText(this);
+        etSubject.setLayoutParams(new LinearLayout.LayoutParams(0,
+                LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+        etSubject.setHint("Subject");
+        etSubject.setInputType(InputType.TYPE_CLASS_TEXT);
+        if (subject != null) etSubject.setText(subject);
+
+        ImageButton btnDelete = new ImageButton(this);
+        btnDelete.setLayoutParams(new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT));
+        btnDelete.setImageResource(android.R.drawable.ic_delete);
+        btnDelete.setVisibility(isEditMode ? View.VISIBLE : View.GONE);
+        btnDelete.setOnClickListener(v -> {
+            layoutTeachersContainer.removeView(row);
+            teacherViews.remove(row);
+        });
+
+        row.addView(etName);
+        row.addView(etSubject);
+        row.addView(btnDelete);
+
+        layoutTeachersContainer.addView(row);
+        teacherViews.add(row);
+    }
+
+    private void toggleEditMode() {
+        isEditMode = !isEditMode;
+        for (View view : teacherViews) {
+            ImageButton btnDelete = (ImageButton) ((LinearLayout) view).getChildAt(2);
+            btnDelete.setVisibility(isEditMode ? View.VISIBLE : View.GONE);
         }
-        int numTeachers = Integer.parseInt(numTeachersStr);
-
-        // Create a TextView header for the table
-        TextView headerTextView = new TextView(this);
-        headerTextView.setText("Name                                Subject");
-        headerTextView.setTextSize(16);
-        headerTextView.setPadding(0, 10, 0, 10);
-        layoutTeachersContainer.addView(headerTextView);
-
-        for (int i = 0; i < numTeachers; i++) {
-            // Create horizontal layout for each row
-            LinearLayout row = new LinearLayout(this);
-            row.setOrientation(LinearLayout.HORIZONTAL);
-            row.setLayoutParams(new LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.MATCH_PARENT,
-                    LinearLayout.LayoutParams.WRAP_CONTENT));
-            row.setPadding(0, 8, 0, 8);
-
-            // Teacher name field
-            EditText etTeacherName = new EditText(this);
-            etTeacherName.setLayoutParams(new LinearLayout.LayoutParams(0,
-                    LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
-            etTeacherName.setHint("Name");
-            etTeacherName.setInputType(InputType.TYPE_CLASS_TEXT);
-
-            // Subject field
-            EditText etSubject = new EditText(this);
-            etSubject.setLayoutParams(new LinearLayout.LayoutParams(0,
-                    LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
-            etSubject.setHint("Subject");
-            etSubject.setInputType(InputType.TYPE_CLASS_TEXT);
-
-            // Add to tracking lists
-            teacherNameEditTexts.add(etTeacherName);
-            teacherSubjectEditTexts.add(etSubject);
-
-            // Add to row
-            row.addView(etTeacherName);
-            row.addView(etSubject);
-
-            // Add row to container
-            layoutTeachersContainer.addView(row);
-        }
+        btnEditTeachers.setText(isEditMode ? "Done Editing" : "Edit Teachers");
     }
 
     private void saveTeachersToBack4App() {
-        try {
-            if (teacherNameEditTexts.isEmpty() || teacherSubjectEditTexts.isEmpty()) {
-                Toast.makeText(this, "Please add teachers first", Toast.LENGTH_SHORT).show();
-                return;
-            }
+        List<String> teacherNames = new ArrayList<>();
+        List<String> teacherSubjects = new ArrayList<>();
 
-            List<String> teacherNames = new ArrayList<>();
-            List<String> teacherSubjects = new ArrayList<>();
+        for (View view : teacherViews) {
+            EditText etName = (EditText) ((LinearLayout) view).getChildAt(0);
+            EditText etSubject = (EditText) ((LinearLayout) view).getChildAt(1);
 
-            // Collect data from input fields
-            for (int i = 0; i < teacherNameEditTexts.size(); i++) {
-                String name = teacherNameEditTexts.get(i).getText().toString().trim();
-                String subject = teacherSubjectEditTexts.get(i).getText().toString().trim();
+            String name = etName.getText().toString().trim();
+            String subject = etSubject.getText().toString().trim();
 
-                if (name.isEmpty() || subject.isEmpty()) {
-                    Toast.makeText(this, "Please fill all teacher and subject fields",
-                            Toast.LENGTH_SHORT).show();
-                    return;
-                }
-
+            if (!name.isEmpty() && !subject.isEmpty()) {
                 teacherNames.add(name);
                 teacherSubjects.add(subject);
-
-                // Create individual teacher objects
-                ParseObject teacher = new ParseObject("Teacher");
-                teacher.put("user", ParseUser.getCurrentUser());
-                teacher.put("name", name);
-                teacher.put("subject", subject);
-
-                teacher.saveInBackground(e -> {
-                    if (e != null) {
-                        Log.e("TeacherSave", "Error saving teacher: " + e.getMessage());
-                    }
-                });
             }
-
-            // Also save a summary object that contains all teachers and subjects
-            ParseObject teacherSummary = new ParseObject("TeacherSummary");
-            teacherSummary.put("user", ParseUser.getCurrentUser());
-            teacherSummary.put("teacherNames", teacherNames);
-            teacherSummary.put("teacherSubjects", teacherSubjects);
-
-            teacherSummary.saveInBackground(e -> {
-                if (e == null) {
-                    Toast.makeText(TeachersActivity.this,
-                            "Teachers saved successfully!", Toast.LENGTH_SHORT).show();
-
-                    // Navigate to next activity - you'll need to change this
-                    // to whatever your next activity should be
-                    navigateToNextActivity();
-                } else {
-                    Toast.makeText(TeachersActivity.this,
-                            "Error saving teachers: " + e.getMessage(), Toast.LENGTH_LONG).show();
-                }
-            });
-
-        } catch (Exception e) {
-            Toast.makeText(this, "Error: " + e.getMessage(), Toast.LENGTH_SHORT).show();
         }
+
+        if (teacherNames.isEmpty()) {
+            Toast.makeText(this, "Please add at least one teacher.", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        ParseObject teachers = new ParseObject("Teachers");
+        teachers.put("user", ParseUser.getCurrentUser());
+        teachers.put("names", teacherNames);
+        teachers.put("subjects", teacherSubjects);
+        teachers.saveInBackground(e -> {
+            if (e == null) {
+                Toast.makeText(this, "Teachers saved!", Toast.LENGTH_SHORT).show();
+                navigateToNextActivity();
+            } else {
+                Toast.makeText(this, "Save error: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+            }
+        });
     }
 
     private void navigateToNextActivity() {
-        // Change SubjectsActivity.class to whatever your next activity should be
-        Intent intent = new Intent(TeachersActivity.this, WellcomeActivity.class);
+        Intent intent = new Intent(TeachersActivity.this, BatchActivity.class);
         startActivity(intent);
         finish();
     }

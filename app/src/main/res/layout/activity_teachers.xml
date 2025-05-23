@@ -20,42 +20,52 @@
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Enter no of teachers"
+                android:text="Teacher Management"
                 android:textSize="18sp"
                 android:textStyle="bold"
                 android:layout_marginBottom="16dp"/>
 
-            <EditText
-                android:id="@+id/etNumTeachers"
+            <!-- Add/Edit buttons row -->
+            <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:hint="Number of teachers"
-                android:inputType="number" />
+                android:orientation="horizontal"
+                android:gravity="center"
+                android:layout_marginBottom="16dp">
 
-            <Button
-                android:id="@+id/btnGenerateTeacherFields"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Set Teachers" />
+                <Button
+                    android:id="@+id/btnAddTeacher"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="Add Teacher"
+                    android:layout_marginEnd="8dp"/>
 
-            <!-- Container for dynamically added teacher fields -->
+                <Button
+                    android:id="@+id/btnEditTeachers"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="Edit Teachers"/>
+            </LinearLayout>
+
+            <!-- Dynamic teacher fields container -->
             <LinearLayout
                 android:id="@+id/layoutTeachersContainer"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="vertical"
-                android:layout_marginTop="16dp" />
+                android:layout_marginTop="8dp"/>
 
         </LinearLayout>
     </ScrollView>
 
-    <!-- Fixed button at the bottom -->
     <Button
         android:id="@+id/btnNext"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:text="Next"
         android:layout_alignParentBottom="true"
-        android:layout_margin="8dp" />
+        android:layout_margin="8dp"/>
 
 </RelativeLayout>
