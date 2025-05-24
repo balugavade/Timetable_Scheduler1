@@ -1,35 +1,30 @@
 package com.example.timetablescheduler;
 
-import android.content.Intent;
+import android.app.TimePickerDialog;
 import android.os.Bundle;
-import android.text.InputType;
 import android.widget.*;
 import androidx.appcompat.app.AppCompatActivity;
-import com.parse.ParseObject;
-import com.parse.ParseUser;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Calendar;
 import java.util.List;
+import java.util.Locale;
 
 public class DaysPeriodsActivity extends AppCompatActivity {
 
-    private EditText etPeriodsPerDay, etDaysPerWeek;
-    private Button btnGenerateRows, btnSaveTimetable;
-    private LinearLayout layoutPeriodsContainer;
-
+    private EditText etPeriodsPerDay, etDaysPerWeek, etNumBreaks;
+    private Button btnGenerateRows, btnSave, btnGenerateBreakRows;
+    private LinearLayout layoutPeriodsContainer, layoutBreaksContainer;
+    private List<EditText> startTimeFields = new ArrayList<>();
+    private List<EditText> endTimeFields = new ArrayList<>();
     // Breaks
-    private EditText etNumBreaks;
-    private Button btnGenerateBreakRows;
-    private LinearLayout layoutBreaksContainer;
+    private List<EditText> breakAfterFields = new ArrayList<>();
+    private List<EditText> breakStartFields = new ArrayList<>();
+    private List<EditText> breakEndFields = new ArrayList<>();
 
-    // Dynamic lists
-    private List<EditText> startEditTexts = new ArrayList<>();
-    private List<EditText> endEditTexts = new ArrayList<>();
-    private List<EditText> breakAfterEditTexts = new ArrayList<>();
-    private List<EditText> breakStartEditTexts = new ArrayList<>();
-    private List<EditText> breakEndEditTexts = new ArrayList<>();
-
-    private CheckBox cbMonday, cbTuesday, cbWednesday, cbThursday,
-            cbFriday, cbSaturday, cbSunday;
+    private CheckBox cbMonday, cbTuesday, cbWednesday, cbThursday, cbFriday, cbSaturday, cbSunday;
+    private List<CheckBox> dayCheckBoxes = new ArrayList<>();
+    private final String[] dayNames = {"Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"};
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -37,15 +32,15 @@ public class DaysPeriodsActivity extends AppCompatActivity {
         setContentView(R.layout.activity_days_periods);
 
         etPeriodsPerDay = findViewById(R.id.etPeriodsPerDay);
-        etDaysPerWeek = findViewById(R.id.etDaysPerWeek);
         btnGenerateRows = findViewById(R.id.btnGenerateRows);
-        btnSaveTimetable = findViewById(R.id.btnSaveTimetable);
         layoutPeriodsContainer = findViewById(R.id.layoutPeriodsContainer);
 
-        // Breaks
         etNumBreaks = findViewById(R.id.etNumBreaks);
         btnGenerateBreakRows = findViewById(R.id.btnGenerateBreakRows);
         layoutBreaksContainer = findViewById(R.id.layoutBreaksContainer);
+
+        etDaysPerWeek = findViewById(R.id.etDaysPerWeek);
+        btnSave = findViewById(R.id.btnSave);
 
         cbMonday = findViewById(R.id.cbMonday);
         cbTuesday = findViewById(R.id.cbTuesday);
@@ -55,21 +50,40 @@ public class DaysPeriodsActivity extends AppCompatActivity {
         cbSaturday = findViewById(R.id.cbSaturday);
         cbSunday = findViewById(R.id.cbSunday);
 
+        dayCheckBoxes.clear();
+        dayCheckBoxes.add(cbMonday);
+        dayCheckBoxes.add(cbTuesday);
+        dayCheckBoxes.add(cbWednesday);
+        dayCheckBoxes.add(cbThursday);
+        dayCheckBoxes.add(cbFriday);
+        dayCheckBoxes.add(cbSaturday);
+        dayCheckBoxes.add(cbSunday);
+
         btnGenerateRows.setOnClickListener(v -> generatePeriodRows());
         btnGenerateBreakRows.setOnClickListener(v -> generateBreakRows());
-        btnSaveTimetable.setOnClickListener(v -> saveTimetableToBack4App());
+        btnSave.setOnClickListener(v -> saveAllData());
+
+        // Auto-select days when number is entered
+        etDaysPerWeek.setOnFocusChangeListener((v, hasFocus) -> {
+            if (!hasFocus) updateDaySelection();
+        });
+        etDaysPerWeek.setOnEditorActionListener((v, actionId, event) -> {
+            updateDaySelection();
+            return false;
+        });
     }
 
     private void generatePeriodRows() {
         layoutPeriodsContainer.removeAllViews();
-        startEditTexts.clear();
-        endEditTexts.clear();
+        startTimeFields.clear();
+        endTimeFields.clear();
 
         String periodsStr = etPeriodsPerDay.getText().toString().trim();
         if (periodsStr.isEmpty()) {
             Toast.makeText(this, "Enter number of periods", Toast.LENGTH_SHORT).show();
             return;
         }
+
         int periods = Integer.parseInt(periodsStr);
 
         for (int i = 0; i < periods; i++) {
@@ -81,38 +95,46 @@ public class DaysPeriodsActivity extends AppCompatActivity {
             row.setPadding(0, 8, 0, 8);
 
             EditText etStart = new EditText(this);
-            etStart.setLayoutParams(new LinearLayout.LayoutParams(0,
-                    LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
-            etStart.setHint("Start: hh:mm");
-            etStart.setInputType(InputType.TYPE_CLASS_DATETIME | InputType.TYPE_DATETIME_VARIATION_TIME);
+            etStart.setLayoutParams(new LinearLayout.LayoutParams(
+                    0,
+                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                    1f));
+            etStart.setHint("Start time");
+            etStart.setFocusable(false);
+            etStart.setClickable(true);
 
             EditText etEnd = new EditText(this);
-            etEnd.setLayoutParams(new LinearLayout.LayoutParams(0,
-                    LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
-            etEnd.setHint("End: hh:mm");
-            etEnd.setInputType(InputType.TYPE_CLASS_DATETIME | InputType.TYPE_DATETIME_VARIATION_TIME);
+            etEnd.setLayoutParams(new LinearLayout.LayoutParams(
+                    0,
+                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                    1f));
+            etEnd.setHint("End time");
+            etEnd.setFocusable(false);
+            etEnd.setClickable(true);
 
-            startEditTexts.add(etStart);
-            endEditTexts.add(etEnd);
+            etStart.setOnClickListener(v -> showStartTimePicker(etStart, etEnd));
+            etEnd.setOnClickListener(v -> showEndTimePicker(etEnd));
 
+            startTimeFields.add(etStart);
+            endTimeFields.add(etEnd);
             row.addView(etStart);
             row.addView(etEnd);
-
             layoutPeriodsContainer.addView(row);
         }
     }
 
     private void generateBreakRows() {
         layoutBreaksContainer.removeAllViews();
-        breakAfterEditTexts.clear();
-        breakStartEditTexts.clear();
-        breakEndEditTexts.clear();
+        breakAfterFields.clear();
+        breakStartFields.clear();
+        breakEndFields.clear();
 
         String breaksStr = etNumBreaks.getText().toString().trim();
         if (breaksStr.isEmpty()) {
             Toast.makeText(this, "Enter number of breaks", Toast.LENGTH_SHORT).show();
             return;
         }
+
         int numBreaks = Integer.parseInt(breaksStr);
 
         for (int i = 0; i < numBreaks; i++) {
@@ -127,23 +149,28 @@ public class DaysPeriodsActivity extends AppCompatActivity {
             etBreakAfter.setLayoutParams(new LinearLayout.LayoutParams(0,
                     LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
             etBreakAfter.setHint("Break after period");
-            etBreakAfter.setInputType(InputType.TYPE_CLASS_NUMBER);
+            etBreakAfter.setInputType(android.text.InputType.TYPE_CLASS_NUMBER);
 
             EditText etBreakStart = new EditText(this);
             etBreakStart.setLayoutParams(new LinearLayout.LayoutParams(0,
                     LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
-            etBreakStart.setHint("Break Start: hh:mm");
-            etBreakStart.setInputType(InputType.TYPE_CLASS_DATETIME | InputType.TYPE_DATETIME_VARIATION_TIME);
+            etBreakStart.setHint("Break start");
+            etBreakStart.setFocusable(false);
+            etBreakStart.setClickable(true);
 
             EditText etBreakEnd = new EditText(this);
             etBreakEnd.setLayoutParams(new LinearLayout.LayoutParams(0,
                     LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
-            etBreakEnd.setHint("Break End: hh:mm");
-            etBreakEnd.setInputType(InputType.TYPE_CLASS_DATETIME | InputType.TYPE_DATETIME_VARIATION_TIME);
+            etBreakEnd.setHint("Break end");
+            etBreakEnd.setFocusable(false);
+            etBreakEnd.setClickable(true);
 
-            breakAfterEditTexts.add(etBreakAfter);
-            breakStartEditTexts.add(etBreakStart);
-            breakEndEditTexts.add(etBreakEnd);
+            etBreakStart.setOnClickListener(v -> showTimePicker12Hour(etBreakStart));
+            etBreakEnd.setOnClickListener(v -> showTimePicker12Hour(etBreakEnd));
+
+            breakAfterFields.add(etBreakAfter);
+            breakStartFields.add(etBreakStart);
+            breakEndFields.add(etBreakEnd);
 
             row.addView(etBreakAfter);
             row.addView(etBreakStart);
@@ -153,89 +180,142 @@ public class DaysPeriodsActivity extends AppCompatActivity {
         }
     }
 
-    private void saveTimetableToBack4App() {
-        try {
-            int periodsPerDay = Integer.parseInt(etPeriodsPerDay.getText().toString().trim());
-            int daysPerWeek = Integer.parseInt(etDaysPerWeek.getText().toString().trim());
+    private void showStartTimePicker(EditText etStart, EditText etEnd) {
+        Calendar calendar = Calendar.getInstance();
+        int hour = calendar.get(Calendar.HOUR_OF_DAY);
+        int minute = calendar.get(Calendar.MINUTE);
 
-            // Period times
-            List<String> startTimes = new ArrayList<>();
-            List<String> endTimes = new ArrayList<>();
-            for (int i = 0; i < startEditTexts.size(); i++) {
-                String start = startEditTexts.get(i).getText().toString().trim();
-                String end = endEditTexts.get(i).getText().toString().trim();
-                if (!start.isEmpty() && !end.isEmpty()) {
-                    startTimes.add(start);
-                    endTimes.add(end);
-                } else {
-                    Toast.makeText(this, "Fill all start/end times", Toast.LENGTH_SHORT).show();
-                    return;
-                }
-            }
+        TimePickerDialog timePicker = new TimePickerDialog(this,
+                (view, selectedHour, selectedMinute) -> {
+                    Calendar cal = Calendar.getInstance();
+                    cal.set(Calendar.HOUR_OF_DAY, selectedHour);
+                    cal.set(Calendar.MINUTE, selectedMinute);
 
-            // Breaks
-            List<Integer> breakAfterPeriods = new ArrayList<>();
-            List<String> breakStarts = new ArrayList<>();
-            List<String> breakEnds = new ArrayList<>();
-            for (int i = 0; i < breakAfterEditTexts.size(); i++) {
-                String afterStr = breakAfterEditTexts.get(i).getText().toString().trim();
-                String startStr = breakStartEditTexts.get(i).getText().toString().trim();
-                String endStr = breakEndEditTexts.get(i).getText().toString().trim();
-                if (!afterStr.isEmpty() && !startStr.isEmpty() && !endStr.isEmpty()) {
-                    breakAfterPeriods.add(Integer.parseInt(afterStr));
-                    breakStarts.add(startStr);
-                    breakEnds.add(endStr);
-                } else {
-                    Toast.makeText(this, "Fill all break fields", Toast.LENGTH_SHORT).show();
-                    return;
-                }
-            }
+                    SimpleDateFormat sdf = new SimpleDateFormat("hh:mm a", Locale.US);
+                    String startTime = sdf.format(cal.getTime());
+                    etStart.setText(startTime);
 
-            // Days
-            List<String> selectedDays = new ArrayList<>();
-            addDayIfChecked(selectedDays, cbMonday, "Monday");
-            addDayIfChecked(selectedDays, cbTuesday, "Tuesday");
-            addDayIfChecked(selectedDays, cbWednesday, "Wednesday");
-            addDayIfChecked(selectedDays, cbThursday, "Thursday");
-            addDayIfChecked(selectedDays, cbFriday, "Friday");
-            addDayIfChecked(selectedDays, cbSaturday, "Saturday");
-            addDayIfChecked(selectedDays, cbSunday, "Sunday");
+                    // Set end time to one hour later
+                    cal.add(Calendar.HOUR_OF_DAY, 1);
+                    String endTime = sdf.format(cal.getTime());
+                    etEnd.setText(endTime);
+                }, hour, minute, false);
 
-            if (selectedDays.isEmpty()) {
-                Toast.makeText(this, "Please select at least one day.", Toast.LENGTH_SHORT).show();
-                return;
-            }
+        timePicker.setTitle("Select Start Time");
+        timePicker.show();
+    }
 
-            ParseObject timetable = new ParseObject("Timetable");
-            timetable.put("user", ParseUser.getCurrentUser());
-            timetable.put("periodsPerDay", periodsPerDay);
-            timetable.put("daysPerWeek", daysPerWeek);
-            timetable.put("startTimes", startTimes);
-            timetable.put("endTimes", endTimes);
-            timetable.put("breakAfterPeriods", breakAfterPeriods);
-            timetable.put("breakStarts", breakStarts);
-            timetable.put("breakEnds", breakEnds);
-            timetable.put("selectedDays", selectedDays);
+    private void showEndTimePicker(EditText etEnd) {
+        Calendar calendar = Calendar.getInstance();
+        int hour = calendar.get(Calendar.HOUR_OF_DAY);
+        int minute = calendar.get(Calendar.MINUTE);
 
-            timetable.saveInBackground(e -> {
-                if (e == null) {
-                    Toast.makeText(this, "Timetable saved!", Toast.LENGTH_SHORT).show();
-                    // Navigate to TeachersActivity after successful save
-                    Intent intent = new Intent(DaysPeriodsActivity.this, TeachersActivity.class);
-                    startActivity(intent);
-                    finish();
-                } else {
-                    Toast.makeText(this, "Error saving timetable: " + e.getMessage(), Toast.LENGTH_SHORT).show();
-                }
-            });
-        } catch (NumberFormatException e) {
-            Toast.makeText(this, "Please fill all required numerical fields.", Toast.LENGTH_SHORT).show();
+        TimePickerDialog timePicker = new TimePickerDialog(this,
+                (view, selectedHour, selectedMinute) -> {
+                    Calendar cal = Calendar.getInstance();
+                    cal.set(Calendar.HOUR_OF_DAY, selectedHour);
+                    cal.set(Calendar.MINUTE, selectedMinute);
+
+                    SimpleDateFormat sdf = new SimpleDateFormat("hh:mm a", Locale.US);
+                    String endTime = sdf.format(cal.getTime());
+                    etEnd.setText(endTime);
+                }, hour, minute, false);
+
+        timePicker.setTitle("Select End Time");
+        timePicker.show();
+    }
+
+    private void showTimePicker12Hour(EditText et) {
+        Calendar calendar = Calendar.getInstance();
+        int hour = calendar.get(Calendar.HOUR_OF_DAY);
+        int minute = calendar.get(Calendar.MINUTE);
+
+        TimePickerDialog timePicker = new TimePickerDialog(this,
+                (view, selectedHour, selectedMinute) -> {
+                    Calendar cal = Calendar.getInstance();
+                    cal.set(Calendar.HOUR_OF_DAY, selectedHour);
+                    cal.set(Calendar.MINUTE, selectedMinute);
+
+                    SimpleDateFormat sdf = new SimpleDateFormat("hh:mm a", Locale.US);
+                    String time = sdf.format(cal.getTime());
+                    et.setText(time);
+                }, hour, minute, false);
+
+        timePicker.setTitle("Select Time");
+        timePicker.show();
+    }
+
+    private void updateDaySelection() {
+        String daysStr = etDaysPerWeek.getText().toString().trim();
+        int numDays = 0;
+        if (!daysStr.isEmpty()) {
+            try {
+                numDays = Integer.parseInt(daysStr);
+            } catch (NumberFormatException ignored) {}
+        }
+        for (int i = 0; i < dayCheckBoxes.size(); i++) {
+            dayCheckBoxes.get(i).setChecked(i < numDays);
+            dayCheckBoxes.get(i).setEnabled(i < numDays);
         }
     }
 
-    private void addDayIfChecked(List<String> days, CheckBox checkBox, String dayName) {
-        if (checkBox.isChecked()) {
-            days.add(dayName);
+    private void saveAllData() {
+        List<String> startTimes = new ArrayList<>();
+        List<String> endTimes = new ArrayList<>();
+        for (int i = 0; i < startTimeFields.size(); i++) {
+            String start = startTimeFields.get(i).getText().toString();
+            String end = endTimeFields.get(i).getText().toString();
+            if (start.isEmpty() || end.isEmpty()) {
+                Toast.makeText(this, "Please fill all start and end times.", Toast.LENGTH_SHORT).show();
+                return;
+            }
+            startTimes.add(start);
+            endTimes.add(end);
         }
+
+        // Breaks
+        List<Integer> breakAfterPeriods = new ArrayList<>();
+        List<String> breakStarts = new ArrayList<>();
+        List<String> breakEnds = new ArrayList<>();
+        for (int i = 0; i < breakAfterFields.size(); i++) {
+            String afterStr = breakAfterFields.get(i).getText().toString().trim();
+            String startStr = breakStartFields.get(i).getText().toString().trim();
+            String endStr = breakEndFields.get(i).getText().toString().trim();
+            if (afterStr.isEmpty() || startStr.isEmpty() || endStr.isEmpty()) {
+                Toast.makeText(this, "Please fill all break fields.", Toast.LENGTH_SHORT).show();
+                return;
+            }
+            breakAfterPeriods.add(Integer.parseInt(afterStr));
+            breakStarts.add(startStr);
+            breakEnds.add(endStr);
+        }
+
+        String daysStr = etDaysPerWeek.getText().toString().trim();
+        int daysPerWeek = daysStr.isEmpty() ? 0 : Integer.parseInt(daysStr);
+
+        List<String> selectedDays = new ArrayList<>();
+        for (int i = 0; i < dayCheckBoxes.size(); i++) {
+            if (dayCheckBoxes.get(i).isChecked()) {
+                selectedDays.add(dayNames[i]);
+            }
+        }
+
+        StringBuilder sb = new StringBuilder();
+        sb.append("Periods:\n");
+        for (int i = 0; i < startTimes.size(); i++) {
+            sb.append("Period ").append(i + 1).append(": ")
+                    .append(startTimes.get(i)).append(" - ").append(endTimes.get(i)).append("\n");
+        }
+        sb.append("Breaks:\n");
+        for (int i = 0; i < breakAfterPeriods.size(); i++) {
+            sb.append("After Period ").append(breakAfterPeriods.get(i)).append(": ")
+                    .append(breakStarts.get(i)).append(" - ").append(breakEnds.get(i)).append("\n");
+        }
+        sb.append("Days per week: ").append(daysPerWeek).append("\n");
+        sb.append("Selected days: ").append(selectedDays).append("\n");
+
+        Toast.makeText(this, sb.toString(), Toast.LENGTH_LONG).show();
+
+        // TODO: Save all data to your database here
     }
 }
