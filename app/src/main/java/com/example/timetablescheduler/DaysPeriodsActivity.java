@@ -1,9 +1,11 @@
 package com.example.timetablescheduler;
 
 import android.app.TimePickerDialog;
+import android.content.Intent;
 import android.os.Bundle;
 import android.widget.*;
 import androidx.appcompat.app.AppCompatActivity;
+import com.parse.ParseObject;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Calendar;
@@ -300,22 +302,25 @@ public class DaysPeriodsActivity extends AppCompatActivity {
             }
         }
 
-        StringBuilder sb = new StringBuilder();
-        sb.append("Periods:\n");
-        for (int i = 0; i < startTimes.size(); i++) {
-            sb.append("Period ").append(i + 1).append(": ")
-                    .append(startTimes.get(i)).append(" - ").append(endTimes.get(i)).append("\n");
-        }
-        sb.append("Breaks:\n");
-        for (int i = 0; i < breakAfterPeriods.size(); i++) {
-            sb.append("After Period ").append(breakAfterPeriods.get(i)).append(": ")
-                    .append(breakStarts.get(i)).append(" - ").append(breakEnds.get(i)).append("\n");
-        }
-        sb.append("Days per week: ").append(daysPerWeek).append("\n");
-        sb.append("Selected days: ").append(selectedDays).append("\n");
+        // Save to Parse/Back4App
+        ParseObject timetable = new ParseObject("Timetable");
+        timetable.put("periodsPerDay", startTimes.size());
+        timetable.put("startTimes", startTimes);
+        timetable.put("endTimes", endTimes);
+        timetable.put("breakAfterPeriods", breakAfterPeriods);
+        timetable.put("breakStarts", breakStarts);
+        timetable.put("breakEnds", breakEnds);
+        timetable.put("daysPerWeek", daysPerWeek);
+        timetable.put("selectedDays", selectedDays);
 
-        Toast.makeText(this, sb.toString(), Toast.LENGTH_LONG).show();
-
-        // TODO: Save all data to your database here
+        timetable.saveInBackground(e -> {
+            if (e == null) {
+                Toast.makeText(this, "Saved successfully!", Toast.LENGTH_SHORT).show();
+                startActivity(new Intent(DaysPeriodsActivity.this, TeachersActivity.class));
+                finish();
+            } else {
+                Toast.makeText(this, "Save failed: " + e.getMessage(), Toast.LENGTH_LONG).show();
+            }
+        });
     }
 }
