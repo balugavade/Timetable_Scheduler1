@@ -7,19 +7,15 @@ import android.widget.*;
 import androidx.appcompat.app.AppCompatActivity;
 import com.parse.ParseObject;
 import java.text.SimpleDateFormat;
-import java.util.ArrayList;
-import java.util.Calendar;
-import java.util.List;
-import java.util.Locale;
+import java.util.*;
 
 public class DaysPeriodsActivity extends AppCompatActivity {
 
     private EditText etPeriodsPerDay, etDaysPerWeek, etNumBreaks;
-    private Button btnGenerateRows, btnSave, btnGenerateBreakRows;
+    private Button btnGenerateRows, btnSave, btnGenerateBreakRows, btnNext;
     private LinearLayout layoutPeriodsContainer, layoutBreaksContainer;
     private List<EditText> startTimeFields = new ArrayList<>();
     private List<EditText> endTimeFields = new ArrayList<>();
-    // Breaks
     private List<EditText> breakAfterFields = new ArrayList<>();
     private List<EditText> breakStartFields = new ArrayList<>();
     private List<EditText> breakEndFields = new ArrayList<>();
@@ -43,6 +39,7 @@ public class DaysPeriodsActivity extends AppCompatActivity {
 
         etDaysPerWeek = findViewById(R.id.etDaysPerWeek);
         btnSave = findViewById(R.id.btnSave);
+        btnNext = findViewById(R.id.btnNext);
 
         cbMonday = findViewById(R.id.cbMonday);
         cbTuesday = findViewById(R.id.cbTuesday);
@@ -64,8 +61,12 @@ public class DaysPeriodsActivity extends AppCompatActivity {
         btnGenerateRows.setOnClickListener(v -> generatePeriodRows());
         btnGenerateBreakRows.setOnClickListener(v -> generateBreakRows());
         btnSave.setOnClickListener(v -> saveAllData());
+        btnNext.setOnClickListener(v -> {
+            Intent intent = new Intent(DaysPeriodsActivity.this, TeachersActivity.class);
+            startActivity(intent);
+            finish();
+        });
 
-        // Auto-select days when number is entered
         etDaysPerWeek.setOnFocusChangeListener((v, hasFocus) -> {
             if (!hasFocus) updateDaySelection();
         });
@@ -197,7 +198,6 @@ public class DaysPeriodsActivity extends AppCompatActivity {
                     String startTime = sdf.format(cal.getTime());
                     etStart.setText(startTime);
 
-                    // Set end time to one hour later
                     cal.add(Calendar.HOUR_OF_DAY, 1);
                     String endTime = sdf.format(cal.getTime());
                     etEnd.setText(endTime);
@@ -275,7 +275,6 @@ public class DaysPeriodsActivity extends AppCompatActivity {
             endTimes.add(end);
         }
 
-        // Breaks
         List<Integer> breakAfterPeriods = new ArrayList<>();
         List<String> breakStarts = new ArrayList<>();
         List<String> breakEnds = new ArrayList<>();
@@ -302,7 +301,6 @@ public class DaysPeriodsActivity extends AppCompatActivity {
             }
         }
 
-        // Save to Parse/Back4App
         ParseObject timetable = new ParseObject("Timetable");
         timetable.put("periodsPerDay", startTimes.size());
         timetable.put("startTimes", startTimes);
