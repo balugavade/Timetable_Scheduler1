@@ -1,9 +1,7 @@
 package com.example.timetablescheduler;
 
 import android.content.Intent;
-import android.graphics.Typeface;
 import android.os.Bundle;
-import android.text.InputType;
 import android.view.View;
 import android.widget.*;
 import androidx.appcompat.app.AppCompatActivity;
@@ -18,21 +16,19 @@ import java.util.Map;
 public class BatchActivity extends AppCompatActivity {
 
     private EditText etNumBatches;
-    private Button btnSetBatches, btnNext;
     private LinearLayout layoutBatchesContainer;
     private List<BatchContainer> batchContainers = new ArrayList<>();
 
     private static class BatchContainer {
         EditText etBatchName;
         EditText etNumSubjects;
-        Button btnSetSubjects;
         LinearLayout subjectsContainer;
-        List<SubjectTimeView> subjectViews = new ArrayList<>();
+        List<SubjectView> subjectViews = new ArrayList<>();
     }
 
-    private static class SubjectTimeView {
-        EditText etSubject;
-        EditText etTimeRequired;
+    private static class SubjectView {
+        EditText etSubject, etTeacher, etHours;
+        CheckBox cbLab;
     }
 
     @Override
@@ -40,219 +36,128 @@ public class BatchActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_batch);
 
-        // Toolbar setup
         Toolbar toolbar = findViewById(R.id.toolbar);
         setSupportActionBar(toolbar);
-        if(getSupportActionBar() != null) {
-            getSupportActionBar().setDisplayHomeAsUpEnabled(true);
-            getSupportActionBar().setDisplayShowHomeEnabled(true);
-            getSupportActionBar().setTitle("Batch Management");
-        }
 
         etNumBatches = findViewById(R.id.etNumBatches);
-        btnSetBatches = findViewById(R.id.btnSetBatches);
-        btnNext = findViewById(R.id.btnNext);
         layoutBatchesContainer = findViewById(R.id.layoutBatchesContainer);
+        Button btnSetBatches = findViewById(R.id.btnSetBatches);
+        Button btnNext = findViewById(R.id.btnNext);
 
-        btnSetBatches.setOnClickListener(v -> generateBatchFields());
-        btnNext.setOnClickListener(v -> saveBatchDataAndProceed());
+        btnSetBatches.setOnClickListener(v -> createBatchContainers());
+        btnNext.setOnClickListener(v -> validateAndSave());
     }
 
-    @Override
-    public boolean onSupportNavigateUp() {
-        // Go back to TeachersActivity
-        Intent intent = new Intent(BatchActivity.this, TeachersActivity.class);
-        startActivity(intent);
-        finish();
-        return true;
-    }
-
-    private void generateBatchFields() {
+    private void createBatchContainers() {
+        int batchCount = Integer.parseInt(etNumBatches.getText().toString());
         layoutBatchesContainer.removeAllViews();
         batchContainers.clear();
 
-        String numBatchesStr = etNumBatches.getText().toString().trim();
-        if (numBatchesStr.isEmpty()) {
-            Toast.makeText(this, "Enter number of batches", Toast.LENGTH_SHORT).show();
-            return;
-        }
+        for(int i=0; i<batchCount; i++){
+            LinearLayout batchLayout = new LinearLayout(this);
+            batchLayout.setOrientation(LinearLayout.VERTICAL);
 
-        int numBatches = Integer.parseInt(numBatchesStr);
+            // Batch name input
+            EditText etBatchName = new EditText(this);
+            etBatchName.setHint("Batch " + (i+1) + " Name");
+            batchLayout.addView(etBatchName);
 
-        for (int i = 0; i < numBatches; i++) {
-            createBatchContainer(i + 1);
+            // Subjects configuration
+            EditText etNumSubjects = new EditText(this);
+            etNumSubjects.setHint("Number of Subjects");
+            etNumSubjects.setInputType(android.text.InputType.TYPE_CLASS_NUMBER);
+            batchLayout.addView(etNumSubjects);
+
+            Button btnSetSubjects = new Button(this);
+            btnSetSubjects.setText("Configure Subjects");
+            batchLayout.addView(btnSetSubjects);
+
+            LinearLayout subjectsContainer = new LinearLayout(this);
+            subjectsContainer.setOrientation(LinearLayout.VERTICAL);
+            batchLayout.addView(subjectsContainer);
+
+            BatchContainer container = new BatchContainer();
+            container.etBatchName = etBatchName;
+            container.etNumSubjects = etNumSubjects;
+            container.subjectsContainer = subjectsContainer;
+
+            btnSetSubjects.setOnClickListener(v ->
+                    generateSubjectFields(container));
+
+            batchContainers.add(container);
+            layoutBatchesContainer.addView(batchLayout);
         }
     }
 
-    private void createBatchContainer(int batchNumber) {
-        BatchContainer batchContainer = new BatchContainer();
+    private void generateSubjectFields(BatchContainer container) {
+        int subjectCount = Integer.parseInt(container.etNumSubjects.getText().toString());
+        container.subjectsContainer.removeAllViews();
+        container.subjectViews.clear();
 
-        LinearLayout batchLayout = new LinearLayout(this);
-        batchLayout.setOrientation(LinearLayout.VERTICAL);
-        batchLayout.setLayoutParams(new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT));
-        batchLayout.setPadding(16, 16, 16, 16);
-        batchLayout.setBackgroundResource(android.R.drawable.dialog_holo_light_frame);
-
-        TextView batchLabel = new TextView(this);
-        batchLabel.setText("Batch " + batchNumber);
-        batchLabel.setTextSize(18);
-        batchLabel.setTypeface(batchLabel.getTypeface(), Typeface.BOLD);
-        batchLayout.addView(batchLabel);
-
-        batchContainer.etBatchName = new EditText(this);
-        batchContainer.etBatchName.setLayoutParams(new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT));
-        batchContainer.etBatchName.setHint("Batch Name (e.g., B.Tech CSE Sem 1)");
-        batchLayout.addView(batchContainer.etBatchName);
-
-        batchContainer.etNumSubjects = new EditText(this);
-        batchContainer.etNumSubjects.setLayoutParams(new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT));
-        batchContainer.etNumSubjects.setHint("No of subjects");
-        batchContainer.etNumSubjects.setInputType(InputType.TYPE_CLASS_NUMBER);
-        batchLayout.addView(batchContainer.etNumSubjects);
-
-        batchContainer.btnSetSubjects = new Button(this);
-        batchContainer.btnSetSubjects.setLayoutParams(new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.WRAP_CONTENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT));
-        batchContainer.btnSetSubjects.setText("Set Subjects");
-        batchLayout.addView(batchContainer.btnSetSubjects);
-
-        batchContainer.subjectsContainer = new LinearLayout(this);
-        batchContainer.subjectsContainer.setOrientation(LinearLayout.VERTICAL);
-        batchContainer.subjectsContainer.setLayoutParams(new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT));
-        batchLayout.addView(batchContainer.subjectsContainer);
-
-        batchContainer.btnSetSubjects.setOnClickListener(v ->
-                generateSubjectFields(batchContainer));
-
-        layoutBatchesContainer.addView(batchLayout);
-        batchContainers.add(batchContainer);
-    }
-
-    private void generateSubjectFields(BatchContainer batchContainer) {
-        batchContainer.subjectsContainer.removeAllViews();
-        batchContainer.subjectViews.clear();
-
-        String numSubjectsStr = batchContainer.etNumSubjects.getText().toString().trim();
-        if (numSubjectsStr.isEmpty()) {
-            Toast.makeText(this, "Enter number of subjects", Toast.LENGTH_SHORT).show();
-            return;
-        }
-
-        int numSubjects = Integer.parseInt(numSubjectsStr);
-
-        LinearLayout headerRow = new LinearLayout(this);
-        headerRow.setOrientation(LinearLayout.HORIZONTAL);
-        headerRow.setLayoutParams(new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT));
-
-        TextView subjectHeader = new TextView(this);
-        subjectHeader.setText("Subject");
-        subjectHeader.setLayoutParams(new LinearLayout.LayoutParams(0,
-                LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
-        subjectHeader.setTypeface(subjectHeader.getTypeface(), Typeface.BOLD);
-
-        TextView timeHeader = new TextView(this);
-        timeHeader.setText("Time Required (hours)");
-        timeHeader.setLayoutParams(new LinearLayout.LayoutParams(0,
-                LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
-        timeHeader.setTypeface(timeHeader.getTypeface(), Typeface.BOLD);
-
-        headerRow.addView(subjectHeader);
-        headerRow.addView(timeHeader);
-        batchContainer.subjectsContainer.addView(headerRow);
-
-        for (int i = 0; i < numSubjects; i++) {
-            SubjectTimeView subjectView = new SubjectTimeView();
-
+        for(int i=0; i<subjectCount; i++){
             LinearLayout row = new LinearLayout(this);
             row.setOrientation(LinearLayout.HORIZONTAL);
-            row.setLayoutParams(new LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.MATCH_PARENT,
-                    LinearLayout.LayoutParams.WRAP_CONTENT));
-            row.setPadding(0, 8, 0, 8);
 
+            SubjectView subjectView = new SubjectView();
+
+            // Subject name
             subjectView.etSubject = new EditText(this);
-            subjectView.etSubject.setLayoutParams(new LinearLayout.LayoutParams(0,
-                    LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
-            subjectView.etSubject.setHint("Subject name");
-
-            subjectView.etTimeRequired = new EditText(this);
-            subjectView.etTimeRequired.setLayoutParams(new LinearLayout.LayoutParams(0,
-                    LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
-            subjectView.etTimeRequired.setHint("Hours");
-            subjectView.etTimeRequired.setInputType(InputType.TYPE_CLASS_NUMBER);
-
+            subjectView.etSubject.setHint("Subject Name");
             row.addView(subjectView.etSubject);
-            row.addView(subjectView.etTimeRequired);
 
-            batchContainer.subjectsContainer.addView(row);
-            batchContainer.subjectViews.add(subjectView);
+            // Teacher name
+            subjectView.etTeacher = new EditText(this);
+            subjectView.etTeacher.setHint("Teacher");
+            row.addView(subjectView.etTeacher);
+
+            // Hours
+            subjectView.etHours = new EditText(this);
+            subjectView.etHours.setHint("Hours");
+            subjectView.etHours.setInputType(android.text.InputType.TYPE_CLASS_NUMBER);
+            row.addView(subjectView.etHours);
+
+            // Lab checkbox
+            subjectView.cbLab = new CheckBox(this);
+            subjectView.cbLab.setText("Lab");
+            row.addView(subjectView.cbLab);
+
+            container.subjectsContainer.addView(row);
+            container.subjectViews.add(subjectView);
         }
     }
 
-    private void saveBatchDataAndProceed() {
-        List<Map<String, Object>> batchesData = new ArrayList<>();
+    private void validateAndSave() {
+        List<Map<String, Object>> batchData = new ArrayList<>();
 
-        for (BatchContainer container : batchContainers) {
-            String batchName = container.etBatchName.getText().toString().trim();
-            if (batchName.isEmpty()) {
-                Toast.makeText(this, "Please fill all batch names", Toast.LENGTH_SHORT).show();
-                return;
-            }
+        for(BatchContainer container : batchContainers){
+            Map<String, Object> batch = new HashMap<>();
+            batch.put("name", container.etBatchName.getText().toString());
 
-            List<String> subjects = new ArrayList<>();
-            List<Integer> timeRequirements = new ArrayList<>();
-
-            for (SubjectTimeView subjectView : container.subjectViews) {
-                String subject = subjectView.etSubject.getText().toString().trim();
-                String timeStr = subjectView.etTimeRequired.getText().toString().trim();
-
-                if (subject.isEmpty() || timeStr.isEmpty()) {
-                    Toast.makeText(this, "Please fill all subject and time fields",
-                            Toast.LENGTH_SHORT).show();
-                    return;
-                }
-
+            List<Map<String, Object>> subjects = new ArrayList<>();
+            for(SubjectView view : container.subjectViews){
+                Map<String, Object> subject = new HashMap<>();
+                subject.put("name", view.etSubject.getText().toString());
+                subject.put("teacher", view.etTeacher.getText().toString());
+                subject.put("hours", Integer.parseInt(view.etHours.getText().toString()));
+                subject.put("lab", view.cbLab.isChecked());
                 subjects.add(subject);
-                timeRequirements.add(Integer.parseInt(timeStr));
             }
 
-            Map<String, Object> batchData = new HashMap<>();
-            batchData.put("batchName", batchName);
-            batchData.put("subjects", subjects);
-            batchData.put("timeRequirements", timeRequirements);
-            batchesData.add(batchData);
+            batch.put("subjects", subjects);
+            batchData.add(batch);
         }
 
-        ParseObject batchInfo = new ParseObject("BatchInfo");
-        batchInfo.put("user", ParseUser.getCurrentUser());
-        batchInfo.put("numBatches", batchContainers.size());
-        batchInfo.put("batchesData", batchesData);
-
-        batchInfo.saveInBackground(e -> {
-            if (e == null) {
-                Toast.makeText(this, "Batch data saved!", Toast.LENGTH_SHORT).show();
-                navigateToTimetableGenerator();
+        // Save to Parse
+        ParseObject timetableConfig = new ParseObject("TimetableConfig");
+        timetableConfig.put("user", ParseUser.getCurrentUser());
+        timetableConfig.put("batches", batchData);
+        timetableConfig.saveInBackground(e -> {
+            if(e == null) {
+                startActivity(new Intent(this, TimetableGeneratorActivity.class));
+                finish();
             } else {
-                Toast.makeText(this, "Error saving batch data: " + e.getMessage(),
-                        Toast.LENGTH_SHORT).show();
+                Toast.makeText(this, "Save failed: " + e.getMessage(), Toast.LENGTH_LONG).show();
             }
         });
-    }
-
-    private void navigateToTimetableGenerator() {
-        Intent intent = new Intent(BatchActivity.this, TimetableGeneratorActivity.class);
-        startActivity(intent);
-        finish();
     }
 }

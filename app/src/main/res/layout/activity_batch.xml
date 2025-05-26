@@ -3,13 +3,11 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent">
 
-    <!-- Toolbar at the top -->
     <androidx.appcompat.widget.Toolbar
         android:id="@+id/toolbar"
         android:layout_width="match_parent"
         android:layout_height="?attr/actionBarSize"
         android:background="?attr/colorPrimary"
-        android:theme="@style/ThemeOverlay.AppCompat.Dark.ActionBar"
         android:elevation="4dp"/>
 
     <ScrollView
@@ -21,42 +19,31 @@
         android:fillViewport="true">
 
         <LinearLayout
-            android:id="@+id/layoutBatchContent"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
             android:padding="16dp">
 
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Batch Management"
-                android:textSize="20sp"
-                android:textStyle="bold"
-                android:layout_gravity="center"
-                android:layout_marginBottom="20dp"/>
-
             <EditText
                 android:id="@+id/etNumBatches"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:hint="No of Batches"
-                android:inputType="number"
-                android:layout_marginBottom="8dp"/>
+                android:hint="Number of Batches"
+                android:inputType="number"/>
 
             <Button
                 android:id="@+id/btnSetBatches"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Set Batches"
-                android:layout_marginBottom="16dp"/>
+                android:text="Create Batches"
+                android:layout_marginTop="8dp"/>
 
-            <!-- Container for dynamically added batch fields -->
             <LinearLayout
                 android:id="@+id/layoutBatchesContainer"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:orientation="vertical"/>
+                android:orientation="vertical"
+                android:layout_marginTop="16dp"/>
 
         </LinearLayout>
     </ScrollView>
@@ -66,7 +53,6 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:text="Generate Timetable"
-        android:layout_alignParentBottom="true"
-        android:layout_margin="8dp"/>
+        android:layout_alignParentBottom="true"/>
 
 </RelativeLayout>
