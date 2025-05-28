@@ -62,7 +62,7 @@ public class DaysPeriodsActivity extends AppCompatActivity {
         btnGenerateBreakRows.setOnClickListener(v -> generateBreakRows());
         btnSave.setOnClickListener(v -> saveAllData());
         btnNext.setOnClickListener(v -> {
-            Intent intent = new Intent(DaysPeriodsActivity.this, TeachersActivity.class);
+            Intent intent = new Intent(DaysPeriodsActivity.this, BatchActivity.class);
             startActivity(intent);
             finish();
         });
@@ -115,8 +115,10 @@ public class DaysPeriodsActivity extends AppCompatActivity {
             etEnd.setFocusable(false);
             etEnd.setClickable(true);
 
-            etStart.setOnClickListener(v -> showStartTimePicker(etStart, etEnd));
-            etEnd.setOnClickListener(v -> showEndTimePicker(etEnd));
+            // When start time is picked, end time is auto-set to 1 hour later
+            etStart.setOnClickListener(v -> showStartTimePickerWithAutoEnd(etStart, etEnd));
+            // Allow manual end time change if needed
+            etEnd.setOnClickListener(v -> showTimePicker(etEnd));
 
             startTimeFields.add(etStart);
             endTimeFields.add(etEnd);
@@ -126,6 +128,7 @@ public class DaysPeriodsActivity extends AppCompatActivity {
         }
     }
 
+    // For breaks, both times are set manually
     private void generateBreakRows() {
         layoutBreaksContainer.removeAllViews();
         breakAfterFields.clear();
@@ -168,8 +171,8 @@ public class DaysPeriodsActivity extends AppCompatActivity {
             etBreakEnd.setFocusable(false);
             etBreakEnd.setClickable(true);
 
-            etBreakStart.setOnClickListener(v -> showTimePicker12Hour(etBreakStart));
-            etBreakEnd.setOnClickListener(v -> showTimePicker12Hour(etBreakEnd));
+            etBreakStart.setOnClickListener(v -> showTimePicker(etBreakStart));
+            etBreakEnd.setOnClickListener(v -> showTimePicker(etBreakEnd));
 
             breakAfterFields.add(etBreakAfter);
             breakStartFields.add(etBreakStart);
@@ -183,23 +186,25 @@ public class DaysPeriodsActivity extends AppCompatActivity {
         }
     }
 
-    private void showStartTimePicker(EditText etStart, EditText etEnd) {
+    // For period start: set end time to one hour later automatically
+    private void showStartTimePickerWithAutoEnd(EditText etStart, EditText etEnd) {
         Calendar calendar = Calendar.getInstance();
         int hour = calendar.get(Calendar.HOUR_OF_DAY);
         int minute = calendar.get(Calendar.MINUTE);
 
         TimePickerDialog timePicker = new TimePickerDialog(this,
                 (view, selectedHour, selectedMinute) -> {
-                    Calendar cal = Calendar.getInstance();
-                    cal.set(Calendar.HOUR_OF_DAY, selectedHour);
-                    cal.set(Calendar.MINUTE, selectedMinute);
+                    Calendar startCal = Calendar.getInstance();
+                    startCal.set(Calendar.HOUR_OF_DAY, selectedHour);
+                    startCal.set(Calendar.MINUTE, selectedMinute);
 
                     SimpleDateFormat sdf = new SimpleDateFormat("hh:mm a", Locale.US);
-                    String startTime = sdf.format(cal.getTime());
+                    String startTime = sdf.format(startCal.getTime());
                     etStart.setText(startTime);
 
-                    cal.add(Calendar.HOUR_OF_DAY, 1);
-                    String endTime = sdf.format(cal.getTime());
+                    // Set end time to exactly one hour later
+                    startCal.add(Calendar.HOUR_OF_DAY, 1);
+                    String endTime = sdf.format(startCal.getTime());
                     etEnd.setText(endTime);
                 }, hour, minute, false);
 
@@ -207,27 +212,8 @@ public class DaysPeriodsActivity extends AppCompatActivity {
         timePicker.show();
     }
 
-    private void showEndTimePicker(EditText etEnd) {
-        Calendar calendar = Calendar.getInstance();
-        int hour = calendar.get(Calendar.HOUR_OF_DAY);
-        int minute = calendar.get(Calendar.MINUTE);
-
-        TimePickerDialog timePicker = new TimePickerDialog(this,
-                (view, selectedHour, selectedMinute) -> {
-                    Calendar cal = Calendar.getInstance();
-                    cal.set(Calendar.HOUR_OF_DAY, selectedHour);
-                    cal.set(Calendar.MINUTE, selectedMinute);
-
-                    SimpleDateFormat sdf = new SimpleDateFormat("hh:mm a", Locale.US);
-                    String endTime = sdf.format(cal.getTime());
-                    etEnd.setText(endTime);
-                }, hour, minute, false);
-
-        timePicker.setTitle("Select End Time");
-        timePicker.show();
-    }
-
-    private void showTimePicker12Hour(EditText et) {
+    // For all other time fields (end time, breaks): manual selection
+    private void showTimePicker(EditText et) {
         Calendar calendar = Calendar.getInstance();
         int hour = calendar.get(Calendar.HOUR_OF_DAY);
         int minute = calendar.get(Calendar.MINUTE);
@@ -314,8 +300,6 @@ public class DaysPeriodsActivity extends AppCompatActivity {
         timetable.saveInBackground(e -> {
             if (e == null) {
                 Toast.makeText(this, "Saved successfully!", Toast.LENGTH_SHORT).show();
-                startActivity(new Intent(DaysPeriodsActivity.this, TeachersActivity.class));
-                finish();
             } else {
                 Toast.makeText(this, "Save failed: " + e.getMessage(), Toast.LENGTH_LONG).show();
             }

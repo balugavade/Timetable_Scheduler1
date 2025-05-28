@@ -37,7 +37,7 @@ public class WelcomeActivity extends AppCompatActivity {
         );
 
         cardTimetable.setOnClickListener(v ->
-                startActivity(new Intent(this, TimetableActivity.class))
+                startActivity(new Intent(this, DaysPeriodsActivity.class))
         );
 
         btnLogout.setOnClickListener(v -> {

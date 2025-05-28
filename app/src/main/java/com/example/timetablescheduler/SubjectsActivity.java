@@ -1,7 +1,5 @@
 package com.example.timetablescheduler;
 
-import static kotlin.text.Typography.section;
-
 import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -22,7 +20,7 @@ public class SubjectsActivity extends AppCompatActivity {
     private Button btnEditSubjects, btnSaveSubjects;
     private boolean isEditMode = false;
     private List<View> subjectViews = new ArrayList<>();
-    private List<HashMap<String, String>> teachersList = new ArrayList<>(); // Each: {objectId, name}
+    private List<HashMap<String, String>> teachersList = new ArrayList<>();
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -40,25 +38,27 @@ public class SubjectsActivity extends AppCompatActivity {
         btnEditSubjects.setOnClickListener(v -> toggleEditMode());
         btnSaveSubjects.setOnClickListener(v -> saveSubjectsToBack4App());
 
-        findViewById(R.id.fabAddSubject).setOnClickListener(v -> addSubjectField(null, null, false, null, null, null, null));
+        findViewById(R.id.fabAddSubject).setOnClickListener(v ->
+                addSubjectField(null, null, false, null, null, null, null));
 
         fetchTeachersAndSubjects();
     }
 
     private void fetchTeachersAndSubjects() {
-        // Fetch teachers for spinner
-        ParseQuery<ParseObject> query = ParseQuery.getQuery("Teacher");
-        query.whereEqualTo("user", ParseUser.getCurrentUser());
-        query.findInBackground((objects, e) -> {
+        // Fetch teachers first
+        ParseQuery<ParseObject> teacherQuery = ParseQuery.getQuery("Teacher");
+        teacherQuery.whereEqualTo("user", ParseUser.getCurrentUser());
+        teacherQuery.findInBackground((teachers, e) -> {
             teachersList.clear();
-            if (e == null && objects != null) {
-                for (ParseObject obj : objects) {
+            if (e == null) {
+                for (ParseObject teacher : teachers) {
                     HashMap<String, String> map = new HashMap<>();
-                    map.put("objectId", obj.getObjectId());
-                    map.put("name", obj.getString("name"));
+                    map.put("objectId", teacher.getObjectId());
+                    map.put("name", teacher.getString("name"));
                     teachersList.add(map);
                 }
             }
+            // Now fetch subjects
             fetchSubjectsFromBack4App();
         });
     }
@@ -71,67 +71,62 @@ public class SubjectsActivity extends AppCompatActivity {
         query.whereEqualTo("user", ParseUser.getCurrentUser());
         query.findInBackground((objects, e) -> {
             if (e == null) {
-                if (objects.isEmpty()) {
-                    addSubjectField(null, null, false, null, null, null, null);
-                } else {
-                    for (ParseObject obj : objects) {
-                        ParseObject teacherObj = obj.getParseObject("teacher");
-                        String teacherId = teacherObj != null ? teacherObj.getObjectId() : null;
-                        addSubjectField(
-                                obj.getString("name"),
-                                teacherId,
-                                obj.getBoolean("lab"),
-                                obj.getString("hours"),
-                                obj.getString("semester"),
-                                obj.getString("section"),
-                                obj.getObjectId()
-                        );
-                    }
+                for (ParseObject obj : objects) {
+                    addSubjectField(
+                            obj.getString("name"),
+                            obj.getParseObject("teacher").getObjectId(),
+                            obj.getBoolean("lab"),
+                            obj.getString("lecturesWeekly"),
+                            obj.getString("semester"),
+                            obj.getString("labsWeekly"),
+                            obj.getObjectId()
+                    );
                 }
-            } else {
-                Toast.makeText(this, "Error fetching subjects: " + e.getMessage(), Toast.LENGTH_SHORT).show();
             }
         });
     }
 
-    private void addSubjectField(String name, String teacherId, boolean lab, String hours, String semester, String section, String objectId) {
+    private void addSubjectField(String name, String teacherId, boolean lab,
+                                 String lectures, String semester, String labs, String objectId) {
         CardView card = (CardView) LayoutInflater.from(this)
                 .inflate(R.layout.subject_item, layoutSubjectsContainer, false);
 
         EditText etName = card.findViewById(R.id.etSubjectName);
         Spinner spinnerTeacher = card.findViewById(R.id.spinnerTeacher);
         CheckBox cbLab = card.findViewById(R.id.cbLab);
-        EditText etHours = card.findViewById(R.id.etHours);
+        EditText etLectures = card.findViewById(R.id.etLecturesWeekly);
         EditText etSemester = card.findViewById(R.id.etSemester);
-        //EditText etSection = card.findViewById(R.id.etSection);
+        EditText etLabs = card.findViewById(R.id.etLabsWeekly);
         ImageButton btnDelete = card.findViewById(R.id.btnDeleteSubject);
 
+        // Populate fields
         etName.setText(name != null ? name : "");
         cbLab.setChecked(lab);
-        etHours.setText(hours != null ? hours : "");
+        etLectures.setText(lectures != null ? lectures : "");
         etSemester.setText(semester != null ? semester : "");
-        //etSection.setText(section != null ? section : "");
+        etLabs.setText(labs != null ? labs : "");
 
-        // Setup spinner
+        // Setup teacher spinner
         List<String> teacherNames = new ArrayList<>();
-        int selectedIdx = 0;
+        int selectedIndex = 0;
         for (int i = 0; i < teachersList.size(); i++) {
             teacherNames.add(teachersList.get(i).get("name"));
-            if (teacherId != null && teacherId.equals(teachersList.get(i).get("objectId"))) {
-                selectedIdx = i;
+            if (teachersList.get(i).get("objectId").equals(teacherId)) {
+                selectedIndex = i;
             }
         }
-        ArrayAdapter<String> adapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_dropdown_item, teacherNames);
+        ArrayAdapter<String> adapter = new ArrayAdapter<>(this,
+                android.R.layout.simple_spinner_dropdown_item, teacherNames);
         spinnerTeacher.setAdapter(adapter);
-        if (!teacherNames.isEmpty()) spinnerTeacher.setSelection(selectedIdx);
+        if (!teacherNames.isEmpty()) spinnerTeacher.setSelection(selectedIndex);
 
+        // Delete button handling
         btnDelete.setVisibility(isEditMode ? View.VISIBLE : View.GONE);
         btnDelete.setOnClickListener(v -> {
             layoutSubjectsContainer.removeView(card);
             subjectViews.remove(card);
             if (objectId != null) {
-                ParseObject obj = ParseObject.createWithoutData("Subject", objectId);
-                obj.deleteInBackground();
+                ParseObject.createWithoutData("Subject", objectId).deleteInBackground();
             }
         });
 
@@ -154,47 +149,39 @@ public class SubjectsActivity extends AppCompatActivity {
             EditText etName = card.findViewById(R.id.etSubjectName);
             Spinner spinnerTeacher = card.findViewById(R.id.spinnerTeacher);
             CheckBox cbLab = card.findViewById(R.id.cbLab);
-            EditText etHours = card.findViewById(R.id.etHours);
+            EditText etLectures = card.findViewById(R.id.etLecturesWeekly);
             EditText etSemester = card.findViewById(R.id.etSemester);
-            //EditText etSection = card.findViewById(R.id.etSection);
+            EditText etLabs = card.findViewById(R.id.etLabsWeekly);
 
-            String name = etName.getText().toString().trim();
-            int selectedTeacher = spinnerTeacher.getSelectedItemPosition();
-            String teacherId = selectedTeacher >= 0 && selectedTeacher < teachersList.size()
-                    ? teachersList.get(selectedTeacher).get("objectId") : null;
-            boolean lab = cbLab.isChecked();
-            String hours = etHours.getText().toString().trim();
-            String semester = etSemester.getText().toString().trim();
-            //String section = etSection.getText().toString().trim();
             String objectId = (String) card.getTag();
+            String name = etName.getText().toString().trim();
+            String teacherId = teachersList.get(spinnerTeacher.getSelectedItemPosition()).get("objectId");
+            boolean lab = cbLab.isChecked();
+            String lectures = etLectures.getText().toString().trim();
+            String semester = etSemester.getText().toString().trim();
+            String labs = etLabs.getText().toString().trim();
 
-            if (!name.isEmpty() && teacherId != null && !hours.isEmpty()) {
-                if (objectId != null) {
-                    // Update existing subject
-                    ParseQuery<ParseObject> query = ParseQuery.getQuery("Subject");
-                    query.getInBackground(objectId, (obj, e) -> {
-                        if (e == null && obj != null) {
-                            obj.put("name", name);
-                            obj.put("teacher", ParseObject.createWithoutData("Teacher", teacherId));
-                            obj.put("lab", lab);
-                            obj.put("hours", hours);
-                            obj.put("semester", semester);
-                            //obj.put("section", section);
-                            obj.saveInBackground();
-                        }
-                    });
-                } else {
-                    // Create new subject
-                    ParseObject subject = new ParseObject("Subject");
-                    subject.put("user", ParseUser.getCurrentUser());
-                    subject.put("name", name);
-                    subject.put("teacher", ParseObject.createWithoutData("Teacher", teacherId));
-                    subject.put("lab", lab);
-                    subject.put("hours", hours);
-                    subject.put("semester", semester);
-                   // subject.put("section", section);
-                    subject.saveInBackground();
-                }
+            if (objectId != null) {
+                // Update existing
+                ParseObject subject = ParseObject.createWithoutData("Subject", objectId);
+                subject.put("name", name);
+                subject.put("teacher", ParseObject.createWithoutData("Teacher", teacherId));
+                subject.put("lab", lab);
+                subject.put("lecturesWeekly", lectures);
+                subject.put("semester", semester);
+                subject.put("labsWeekly", labs);
+                subject.saveInBackground();
+            } else {
+                // Create new
+                ParseObject subject = new ParseObject("Subject");
+                subject.put("user", ParseUser.getCurrentUser());
+                subject.put("name", name);
+                subject.put("teacher", ParseObject.createWithoutData("Teacher", teacherId));
+                subject.put("lab", lab);
+                subject.put("lecturesWeekly", lectures);
+                subject.put("semester", semester);
+                subject.put("labsWeekly", labs);
+                subject.saveInBackground();
             }
         }
         Toast.makeText(this, "Subjects saved!", Toast.LENGTH_SHORT).show();

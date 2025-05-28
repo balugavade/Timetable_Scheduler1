@@ -2,161 +2,209 @@ package com.example.timetablescheduler;
 
 import android.content.Intent;
 import android.os.Bundle;
+import android.view.LayoutInflater;
+import android.view.View;
 import android.widget.*;
 import androidx.appcompat.app.AppCompatActivity;
-import androidx.appcompat.widget.Toolbar;
+import androidx.cardview.widget.CardView;
 import com.parse.ParseObject;
+import com.parse.ParseQuery;
 import com.parse.ParseUser;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
 public class BatchActivity extends AppCompatActivity {
 
-    private EditText etNumBatches;
+    private RadioGroup rgCourseLevel;
+    private EditText etDepartment, etTotalBatches;
+    private Button btnGenerateBatches, btnSave, btnNext;
     private LinearLayout layoutBatchesContainer;
-    private List<BatchContainer> batchContainers = new ArrayList<>();
-
-    private static class BatchContainer {
-        EditText etBatchName;
-        EditText etNumSubjects;
-        LinearLayout subjectsContainer;
-        List<SubjectView> subjectViews = new ArrayList<>();
-    }
-
-    private static class SubjectView {
-        EditText etSubject, etTeacher, etHours;
-        CheckBox cbLab;
-    }
+    private TextView tvBatchesHeader;
+    private List<View> batchViews = new ArrayList<>();
+    private List<HashMap<String, String>> subjectsList = new ArrayList<>();
+    private List<HashMap<String, String>> teachersList = new ArrayList<>();
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_batch);
 
-        Toolbar toolbar = findViewById(R.id.toolbar);
-        setSupportActionBar(toolbar);
-
-        etNumBatches = findViewById(R.id.etNumBatches);
+        rgCourseLevel = findViewById(R.id.rgCourseLevel);
+        etDepartment = findViewById(R.id.etDepartment);
+        etTotalBatches = findViewById(R.id.etTotalBatches);
+        btnGenerateBatches = findViewById(R.id.btnGenerateBatches);
         layoutBatchesContainer = findViewById(R.id.layoutBatchesContainer);
-        Button btnSetBatches = findViewById(R.id.btnSetBatches);
-        Button btnNext = findViewById(R.id.btnNext);
+        tvBatchesHeader = findViewById(R.id.tvBatchesHeader);
+        btnSave = findViewById(R.id.btnSave);
+        btnNext = findViewById(R.id.btnNext);
 
-        btnSetBatches.setOnClickListener(v -> createBatchContainers());
-        btnNext.setOnClickListener(v -> validateAndSave());
+        btnGenerateBatches.setOnClickListener(v -> generateBatchFields());
+        btnSave.setOnClickListener(v -> saveBatchesToBack4App());
+        btnNext.setOnClickListener(v -> {
+            Intent intent = new Intent(BatchActivity.this, TimetableActivity.class);
+            startActivity(intent);
+            finish();
+        });
+
+        fetchSubjectsAndTeachers();
     }
 
-    private void createBatchContainers() {
-        int batchCount = Integer.parseInt(etNumBatches.getText().toString());
-        layoutBatchesContainer.removeAllViews();
-        batchContainers.clear();
-
-        for(int i=0; i<batchCount; i++){
-            LinearLayout batchLayout = new LinearLayout(this);
-            batchLayout.setOrientation(LinearLayout.VERTICAL);
-
-            // Batch name input
-            EditText etBatchName = new EditText(this);
-            etBatchName.setHint("Batch " + (i+1) + " Name");
-            batchLayout.addView(etBatchName);
-
-            // Subjects configuration
-            EditText etNumSubjects = new EditText(this);
-            etNumSubjects.setHint("Number of Subjects");
-            etNumSubjects.setInputType(android.text.InputType.TYPE_CLASS_NUMBER);
-            batchLayout.addView(etNumSubjects);
-
-            Button btnSetSubjects = new Button(this);
-            btnSetSubjects.setText("Configure Subjects");
-            batchLayout.addView(btnSetSubjects);
-
-            LinearLayout subjectsContainer = new LinearLayout(this);
-            subjectsContainer.setOrientation(LinearLayout.VERTICAL);
-            batchLayout.addView(subjectsContainer);
-
-            BatchContainer container = new BatchContainer();
-            container.etBatchName = etBatchName;
-            container.etNumSubjects = etNumSubjects;
-            container.subjectsContainer = subjectsContainer;
-
-            btnSetSubjects.setOnClickListener(v ->
-                    generateSubjectFields(container));
-
-            batchContainers.add(container);
-            layoutBatchesContainer.addView(batchLayout);
-        }
-    }
-
-    private void generateSubjectFields(BatchContainer container) {
-        int subjectCount = Integer.parseInt(container.etNumSubjects.getText().toString());
-        container.subjectsContainer.removeAllViews();
-        container.subjectViews.clear();
-
-        for(int i=0; i<subjectCount; i++){
-            LinearLayout row = new LinearLayout(this);
-            row.setOrientation(LinearLayout.HORIZONTAL);
-
-            SubjectView subjectView = new SubjectView();
-
-            // Subject name
-            subjectView.etSubject = new EditText(this);
-            subjectView.etSubject.setHint("Subject Name");
-            row.addView(subjectView.etSubject);
-
-            // Teacher name
-            subjectView.etTeacher = new EditText(this);
-            subjectView.etTeacher.setHint("Teacher");
-            row.addView(subjectView.etTeacher);
-
-            // Hours
-            subjectView.etHours = new EditText(this);
-            subjectView.etHours.setHint("Hours");
-            subjectView.etHours.setInputType(android.text.InputType.TYPE_CLASS_NUMBER);
-            row.addView(subjectView.etHours);
-
-            // Lab checkbox
-            subjectView.cbLab = new CheckBox(this);
-            subjectView.cbLab.setText("Lab");
-            row.addView(subjectView.cbLab);
-
-            container.subjectsContainer.addView(row);
-            container.subjectViews.add(subjectView);
-        }
-    }
-
-    private void validateAndSave() {
-        List<Map<String, Object>> batchData = new ArrayList<>();
-
-        for(BatchContainer container : batchContainers){
-            Map<String, Object> batch = new HashMap<>();
-            batch.put("name", container.etBatchName.getText().toString());
-
-            List<Map<String, Object>> subjects = new ArrayList<>();
-            for(SubjectView view : container.subjectViews){
-                Map<String, Object> subject = new HashMap<>();
-                subject.put("name", view.etSubject.getText().toString());
-                subject.put("teacher", view.etTeacher.getText().toString());
-                subject.put("hours", Integer.parseInt(view.etHours.getText().toString()));
-                subject.put("lab", view.cbLab.isChecked());
-                subjects.add(subject);
-            }
-
-            batch.put("subjects", subjects);
-            batchData.add(batch);
-        }
-
-        // Save to Parse
-        ParseObject timetableConfig = new ParseObject("TimetableConfig");
-        timetableConfig.put("user", ParseUser.getCurrentUser());
-        timetableConfig.put("batches", batchData);
-        timetableConfig.saveInBackground(e -> {
-            if(e == null) {
-                startActivity(new Intent(this, TimetableActivity.class));
-                finish();
-            } else {
-                Toast.makeText(this, "Save failed: " + e.getMessage(), Toast.LENGTH_LONG).show();
+    private void fetchSubjectsAndTeachers() {
+        // Fetch subjects
+        ParseQuery<ParseObject> subjectQuery = ParseQuery.getQuery("Subject");
+        subjectQuery.whereEqualTo("user", ParseUser.getCurrentUser());
+        subjectQuery.findInBackground((subjects, e) -> {
+            subjectsList.clear();
+            if (e == null) {
+                for (ParseObject subject : subjects) {
+                    HashMap<String, String> map = new HashMap<>();
+                    map.put("objectId", subject.getObjectId());
+                    map.put("name", subject.getString("name"));
+                    subjectsList.add(map);
+                }
             }
         });
+
+        // Fetch teachers
+        ParseQuery<ParseObject> teacherQuery = ParseQuery.getQuery("Teacher");
+        teacherQuery.whereEqualTo("user", ParseUser.getCurrentUser());
+        teacherQuery.findInBackground((teachers, e) -> {
+            teachersList.clear();
+            if (e == null) {
+                for (ParseObject teacher : teachers) {
+                    HashMap<String, String> map = new HashMap<>();
+                    map.put("objectId", teacher.getObjectId());
+                    map.put("name", teacher.getString("name"));
+                    teachersList.add(map);
+                }
+            }
+        });
+    }
+
+    private void generateBatchFields() {
+        String totalBatchesStr = etTotalBatches.getText().toString().trim();
+        if (totalBatchesStr.isEmpty()) {
+            Toast.makeText(this, "Enter total number of batches", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        int totalBatches = Integer.parseInt(totalBatchesStr);
+        layoutBatchesContainer.removeAllViews();
+        batchViews.clear();
+        tvBatchesHeader.setVisibility(View.VISIBLE);
+
+        for (int i = 0; i < totalBatches; i++) {
+            addBatchField(i + 1);
+        }
+    }
+
+    private void addBatchField(int batchNumber) {
+        CardView batchCard = (CardView) LayoutInflater.from(this)
+                .inflate(R.layout.batch_item, layoutBatchesContainer, false);
+
+        TextView tvBatchNumber = batchCard.findViewById(R.id.tvBatchNumber);
+        tvBatchNumber.setText("Batch " + batchNumber);
+
+        Button btnGenerateSubjects = batchCard.findViewById(R.id.btnGenerateSubjects);
+        EditText etTotalSubjects = batchCard.findViewById(R.id.etTotalSubjects);
+        LinearLayout layoutSubjectsContainer = batchCard.findViewById(R.id.layoutSubjectsContainer);
+
+        btnGenerateSubjects.setOnClickListener(v -> {
+            String totalSubjectsStr = etTotalSubjects.getText().toString().trim();
+            if (totalSubjectsStr.isEmpty()) {
+                Toast.makeText(this, "Enter total subjects for batch " + batchNumber, Toast.LENGTH_SHORT).show();
+                return;
+            }
+            int totalSubjects = Integer.parseInt(totalSubjectsStr);
+            generateSubjectFields(layoutSubjectsContainer, totalSubjects);
+        });
+
+        layoutBatchesContainer.addView(batchCard);
+        batchViews.add(batchCard);
+    }
+
+    private void generateSubjectFields(LinearLayout container, int totalSubjects) {
+        container.removeAllViews();
+
+        for (int i = 0; i < totalSubjects; i++) {
+            LinearLayout subjectRow = new LinearLayout(this);
+            subjectRow.setOrientation(LinearLayout.HORIZONTAL);
+            subjectRow.setLayoutParams(new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT));
+            subjectRow.setPadding(0, 8, 0, 8);
+
+            // Subject Spinner
+            Spinner spinnerSubject = new Spinner(this);
+            spinnerSubject.setLayoutParams(new LinearLayout.LayoutParams(
+                    0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+            List<String> subjectNames = new ArrayList<>();
+            for (HashMap<String, String> subject : subjectsList) {
+                subjectNames.add(subject.get("name"));
+            }
+            ArrayAdapter<String> subjectAdapter = new ArrayAdapter<>(this,
+                    android.R.layout.simple_spinner_dropdown_item, subjectNames);
+            spinnerSubject.setAdapter(subjectAdapter);
+
+            // Teacher Spinner
+            Spinner spinnerTeacher = new Spinner(this);
+            spinnerTeacher.setLayoutParams(new LinearLayout.LayoutParams(
+                    0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+            List<String> teacherNames = new ArrayList<>();
+            for (HashMap<String, String> teacher : teachersList) {
+                teacherNames.add(teacher.get("name"));
+            }
+            ArrayAdapter<String> teacherAdapter = new ArrayAdapter<>(this,
+                    android.R.layout.simple_spinner_dropdown_item, teacherNames);
+            spinnerTeacher.setAdapter(teacherAdapter);
+
+            subjectRow.addView(spinnerSubject);
+            subjectRow.addView(spinnerTeacher);
+            container.addView(subjectRow);
+        }
+    }
+
+    private void saveBatchesToBack4App() {
+        String courseLevel = "";
+        int selectedId = rgCourseLevel.getCheckedRadioButtonId();
+        if (selectedId == R.id.rbUG) {
+            courseLevel = "UG";
+        } else if (selectedId == R.id.rbPG) {
+            courseLevel = "PG";
+        }
+
+        String department = etDepartment.getText().toString().trim();
+
+        if (courseLevel.isEmpty() || department.isEmpty()) {
+            Toast.makeText(this, "Please fill all required fields", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        for (View batchView : batchViews) {
+            EditText etBatchName = batchView.findViewById(R.id.etBatchName);
+            CheckBox cbSectionA = batchView.findViewById(R.id.cbSectionA);
+            CheckBox cbSectionB = batchView.findViewById(R.id.cbSectionB);
+            EditText etAcademicYear = batchView.findViewById(R.id.etAcademicYear);
+
+            String batchName = etBatchName.getText().toString().trim();
+            String academicYear = etAcademicYear.getText().toString().trim();
+            List<String> sections = new ArrayList<>();
+            if (cbSectionA.isChecked()) sections.add("A");
+            if (cbSectionB.isChecked()) sections.add("B");
+
+            if (!batchName.isEmpty() && !academicYear.isEmpty()) {
+                ParseObject batch = new ParseObject("Batch");
+                batch.put("user", ParseUser.getCurrentUser());
+                batch.put("courseLevel", courseLevel);
+                batch.put("department", department);
+                batch.put("batchName", batchName);
+                batch.put("sections", sections);
+                batch.put("academicYear", academicYear);
+                batch.saveInBackground();
+            }
+        }
+
+        Toast.makeText(this, "Batches saved successfully!", Toast.LENGTH_SHORT).show();
     }
 }

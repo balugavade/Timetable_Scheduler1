@@ -1,58 +1,140 @@
 <?xml version="1.0" encoding="utf-8"?>
-<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
-    android:layout_height="match_parent">
+    android:layout_height="match_parent"
+    android:background="@android:color/white">
 
-    <androidx.appcompat.widget.Toolbar
-        android:id="@+id/toolbar"
+    <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="?attr/actionBarSize"
-        android:background="?attr/colorPrimary"
-        android:elevation="4dp"/>
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="20dp">
 
-    <ScrollView
-        android:id="@+id/scrollView"
-        android:layout_below="@id/toolbar"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:layout_above="@+id/btnNext"
-        android:fillViewport="true">
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Batch Configuration"
+            android:textStyle="bold"
+            android:textSize="24sp"
+            android:textColor="@color/purple_500"
+            android:layout_gravity="center_horizontal"
+            android:layout_marginBottom="24dp"/>
 
+        <!-- UG/PG Selection -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Course Level"
+            android:textStyle="bold"
+            android:textSize="16sp"
+            android:layout_marginBottom="8dp"/>
+
+        <RadioGroup
+            android:id="@+id/rgCourseLevel"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginBottom="16dp">
+
+            <RadioButton
+                android:id="@+id/rbUG"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="UG (Under Graduate)"
+                android:layout_marginEnd="24dp"/>
+
+            <RadioButton
+                android:id="@+id/rbPG"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="PG (Post Graduate)"/>
+        </RadioGroup>
+
+        <!-- Department -->
+        <com.google.android.material.textfield.TextInputLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="Department"
+            style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+            android:layout_marginBottom="16dp">
+
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/etDepartment"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:inputType="text"/>
+        </com.google.android.material.textfield.TextInputLayout>
+
+        <!-- Total Number of Batches -->
+        <com.google.android.material.textfield.TextInputLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="Total Number of Batches"
+            style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+            android:layout_marginBottom="16dp">
+
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/etTotalBatches"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:inputType="number"/>
+        </com.google.android.material.textfield.TextInputLayout>
+
+        <Button
+            android:id="@+id/btnGenerateBatches"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Generate Batch Fields"
+            android:layout_gravity="end"
+            android:layout_marginBottom="16dp"/>
+
+        <!-- Dynamic Batches Container -->
+        <TextView
+            android:id="@+id/tvBatchesHeader"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Batches"
+            android:textStyle="bold"
+            android:textSize="18sp"
+            android:layout_marginBottom="12dp"
+            android:visibility="gone"/>
+
+        <LinearLayout
+            android:id="@+id/layoutBatchesContainer"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"/>
+
+        <!-- Save and Next Buttons -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="vertical"
-            android:padding="16dp">
-
-            <EditText
-                android:id="@+id/etNumBatches"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:hint="Number of Batches"
-                android:inputType="number"/>
+            android:orientation="horizontal"
+            android:layout_marginTop="24dp">
 
             <Button
-                android:id="@+id/btnSetBatches"
-                android:layout_width="wrap_content"
+                android:id="@+id/btnSave"
+                android:layout_width="0dp"
                 android:layout_height="wrap_content"
-                android:text="Create Batches"
-                android:layout_marginTop="8dp"/>
+                android:layout_weight="1"
+                android:text="Save"
+                android:backgroundTint="@color/purple_500"
+                android:textColor="@android:color/white"/>
 
-            <LinearLayout
-                android:id="@+id/layoutBatchesContainer"
-                android:layout_width="match_parent"
+            <Space
+                android:layout_width="16dp"
+                android:layout_height="wrap_content"/>
+
+            <Button
+                android:id="@+id/btnNext"
+                android:layout_width="0dp"
                 android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:layout_marginTop="16dp"/>
-
+                android:layout_weight="1"
+                android:text="Generate Timetable"
+                android:backgroundTint="@color/teal_700"
+                android:textColor="@android:color/white"/>
         </LinearLayout>
-    </ScrollView>
 
-    <Button
-        android:id="@+id/btnNext"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="Generate Timetable"
-        android:layout_alignParentBottom="true"/>
-
-</RelativeLayout>
+    </LinearLayout>
+</ScrollView>
