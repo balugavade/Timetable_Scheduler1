@@ -1,127 +1,157 @@
 package com.example.timetablescheduler;
 
-import android.content.Intent;
 import android.os.Bundle;
-import android.text.InputType;
+import android.view.LayoutInflater;
 import android.view.View;
 import android.widget.*;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.appcompat.widget.Toolbar;
+import androidx.cardview.widget.CardView;
 import com.parse.ParseObject;
+import com.parse.ParseQuery;
 import com.parse.ParseUser;
 import java.util.ArrayList;
 import java.util.List;
 
 public class TeachersActivity extends AppCompatActivity {
 
-    private Button btnAddTeacher, btnEditTeachers, btnNext;
     private LinearLayout layoutTeachersContainer;
-    private List<View> teacherViews = new ArrayList<>();
+    private Button btnEditTeachers, btnSaveTeachers;
     private boolean isEditMode = false;
+    private List<View> teacherViews = new ArrayList<>();
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_teachers);
 
-        btnAddTeacher = findViewById(R.id.btnAddTeacher);
-        btnEditTeachers = findViewById(R.id.btnEditTeachers);
-        btnNext = findViewById(R.id.btnNext);
-        layoutTeachersContainer = findViewById(R.id.layoutTeachersContainer);
+        Toolbar toolbar = findViewById(R.id.toolbar);
+        setSupportActionBar(toolbar);
+        toolbar.setNavigationOnClickListener(v -> onBackPressed());
 
-        btnAddTeacher.setOnClickListener(v -> addTeacherField(null, null));
+        layoutTeachersContainer = findViewById(R.id.layoutTeachersContainer);
+        btnEditTeachers = findViewById(R.id.btnEditTeachers);
+        btnSaveTeachers = findViewById(R.id.btnSaveTeachers);
+
         btnEditTeachers.setOnClickListener(v -> toggleEditMode());
-        btnNext.setOnClickListener(v -> saveTeachersToBack4App());
+        btnSaveTeachers.setOnClickListener(v -> saveTeachersToBack4App());
+
+        findViewById(R.id.fabAddTeacher).setOnClickListener(v -> addTeacherField(null, null, null, null, null, null));
+
+        fetchTeachersFromBack4App();
     }
 
-    private void addTeacherField(String name, String subject) {
-        LinearLayout row = new LinearLayout(this);
-        row.setOrientation(LinearLayout.HORIZONTAL);
-        row.setLayoutParams(new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT));
-        row.setPadding(0, 8, 0, 8);
+    private void fetchTeachersFromBack4App() {
+        layoutTeachersContainer.removeAllViews();
+        teacherViews.clear();
 
-        EditText etName = new EditText(this);
-        etName.setLayoutParams(new LinearLayout.LayoutParams(0,
-                LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
-        etName.setHint("Teacher Name");
-        etName.setInputType(InputType.TYPE_CLASS_TEXT);
-        if (name != null) etName.setText(name);
+        ParseQuery<ParseObject> query = ParseQuery.getQuery("Teacher");
+        query.whereEqualTo("user", ParseUser.getCurrentUser());
+        query.findInBackground((objects, e) -> {
+            if (e == null) {
+                if (objects.isEmpty()) {
+                    addTeacherField(null, null, null, null, null, null);
+                } else {
+                    for (ParseObject obj : objects) {
+                        addTeacherField(
+                                obj.getString("name"),
+                                obj.getString("position"),
+                                obj.getString("load"),
+                                obj.getString("subjects"),
+                                obj.getString("department"),
+                                obj.getObjectId()
+                        );
+                    }
+                }
+            } else {
+                Toast.makeText(this, "Error fetching teachers: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+            }
+        });
+    }
 
-        EditText etSubject = new EditText(this);
-        etSubject.setLayoutParams(new LinearLayout.LayoutParams(0,
-                LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
-        etSubject.setHint("Subject");
-        etSubject.setInputType(InputType.TYPE_CLASS_TEXT);
-        if (subject != null) etSubject.setText(subject);
+    private void addTeacherField(String name, String position, String load, String subjects, String department, String objectId) {
+        CardView card = (CardView) LayoutInflater.from(this)
+                .inflate(R.layout.teacher_item, layoutTeachersContainer, false);
 
-        ImageButton btnDelete = new ImageButton(this);
-        btnDelete.setLayoutParams(new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.WRAP_CONTENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT));
-        btnDelete.setImageResource(android.R.drawable.ic_delete);
+        EditText etName = card.findViewById(R.id.etTeacherName);
+        EditText etPosition = card.findViewById(R.id.etTeacherPosition);
+        EditText etLoad = card.findViewById(R.id.etTeacherLoad);
+        EditText etSubjects = card.findViewById(R.id.etTeacherSubjects);
+        EditText etDepartment = card.findViewById(R.id.etTeacherDepartment);
+        ImageButton btnDelete = card.findViewById(R.id.btnDeleteTeacher);
+
+        etName.setText(name != null ? name : "");
+        etPosition.setText(position != null ? position : "");
+        etLoad.setText(load != null ? load : "");
+        etSubjects.setText(subjects != null ? subjects : "");
+        etDepartment.setText(department != null ? department : "");
+
         btnDelete.setVisibility(isEditMode ? View.VISIBLE : View.GONE);
         btnDelete.setOnClickListener(v -> {
-            layoutTeachersContainer.removeView(row);
-            teacherViews.remove(row);
+            layoutTeachersContainer.removeView(card);
+            teacherViews.remove(card);
+            if (objectId != null) {
+                ParseObject obj = ParseObject.createWithoutData("Teacher", objectId);
+                obj.deleteInBackground();
+            }
         });
 
-        row.addView(etName);
-        row.addView(etSubject);
-        row.addView(btnDelete);
-
-        layoutTeachersContainer.addView(row);
-        teacherViews.add(row);
+        card.setTag(objectId);
+        layoutTeachersContainer.addView(card);
+        teacherViews.add(card);
     }
 
     private void toggleEditMode() {
         isEditMode = !isEditMode;
-        for (View view : teacherViews) {
-            ImageButton btnDelete = (ImageButton) ((LinearLayout) view).getChildAt(2);
+        for (View card : teacherViews) {
+            ImageButton btnDelete = card.findViewById(R.id.btnDeleteTeacher);
             btnDelete.setVisibility(isEditMode ? View.VISIBLE : View.GONE);
         }
         btnEditTeachers.setText(isEditMode ? "Done Editing" : "Edit Teachers");
     }
 
     private void saveTeachersToBack4App() {
-        List<String> teacherNames = new ArrayList<>();
-        List<String> teacherSubjects = new ArrayList<>();
-
-        for (View view : teacherViews) {
-            EditText etName = (EditText) ((LinearLayout) view).getChildAt(0);
-            EditText etSubject = (EditText) ((LinearLayout) view).getChildAt(1);
+        for (View card : teacherViews) {
+            EditText etName = card.findViewById(R.id.etTeacherName);
+            EditText etPosition = card.findViewById(R.id.etTeacherPosition);
+            EditText etLoad = card.findViewById(R.id.etTeacherLoad);
+            EditText etSubjects = card.findViewById(R.id.etTeacherSubjects);
+            EditText etDepartment = card.findViewById(R.id.etTeacherDepartment);
 
             String name = etName.getText().toString().trim();
-            String subject = etSubject.getText().toString().trim();
+            String position = etPosition.getText().toString().trim();
+            String load = etLoad.getText().toString().trim();
+            String subjects = etSubjects.getText().toString().trim();
+            String department = etDepartment.getText().toString().trim();
+            String objectId = (String) card.getTag();
 
-            if (!name.isEmpty() && !subject.isEmpty()) {
-                teacherNames.add(name);
-                teacherSubjects.add(subject);
+            if (!name.isEmpty()) {
+                if (objectId != null) {
+                    // Update existing teacher
+                    ParseQuery<ParseObject> query = ParseQuery.getQuery("Teacher");
+                    query.getInBackground(objectId, (obj, e) -> {
+                        if (e == null && obj != null) {
+                            obj.put("name", name);
+                            obj.put("position", position);
+                            obj.put("load", load);
+                            obj.put("subjects", subjects);
+                            obj.put("department", department);
+                            obj.saveInBackground();
+                        }
+                    });
+                } else {
+                    // Create new teacher
+                    ParseObject teacher = new ParseObject("Teacher");
+                    teacher.put("user", ParseUser.getCurrentUser());
+                    teacher.put("name", name);
+                    teacher.put("position", position);
+                    teacher.put("load", load);
+                    teacher.put("subjects", subjects);
+                    teacher.put("department", department);
+                    teacher.saveInBackground();
+                }
             }
         }
-
-        if (teacherNames.isEmpty()) {
-            Toast.makeText(this, "Please add at least one teacher.", Toast.LENGTH_SHORT).show();
-            return;
-        }
-
-        ParseObject teachers = new ParseObject("Teachers");
-        teachers.put("user", ParseUser.getCurrentUser());
-        teachers.put("names", teacherNames);
-        teachers.put("subjects", teacherSubjects);
-        teachers.saveInBackground(e -> {
-            if (e == null) {
-                Toast.makeText(this, "Teachers saved!", Toast.LENGTH_SHORT).show();
-                navigateToNextActivity();
-            } else {
-                Toast.makeText(this, "Save error: " + e.getMessage(), Toast.LENGTH_SHORT).show();
-            }
-        });
-    }
-
-    private void navigateToNextActivity() {
-        Intent intent = new Intent(TeachersActivity.this, BatchActivity.class);
-        startActivity(intent);
-        finish();
+        Toast.makeText(this, "Teachers saved!", Toast.LENGTH_SHORT).show();
     }
 }

@@ -5,6 +5,7 @@ import android.os.Bundle;
 import android.widget.Button;
 import android.widget.TextView;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.cardview.widget.CardView;
 import com.parse.ParseUser;
 
 public class WellcomeActivity extends AppCompatActivity {
@@ -15,7 +16,11 @@ public class WellcomeActivity extends AppCompatActivity {
 
         TextView tvWelcome = findViewById(R.id.textView);
         Button btnLogout = findViewById(R.id.button);
-        Button btnTimetable = findViewById(R.id.button2);
+
+        // CardViews for tiles
+        CardView cardTeacher = findViewById(R.id.cardTeacher);
+        CardView cardSubject = findViewById(R.id.cardSubject);
+        CardView cardTimetable = findViewById(R.id.cardTimetable);
 
         ParseUser currentUser = ParseUser.getCurrentUser();
         if (currentUser != null) {
@@ -23,8 +28,16 @@ public class WellcomeActivity extends AppCompatActivity {
             tvWelcome.setText("Welcome, " + displayName + "!");
         }
 
-        btnTimetable.setOnClickListener(v ->
-                startActivity(new Intent(this, DaysPeriodsActivity.class))
+        cardTeacher.setOnClickListener(v ->
+                startActivity(new Intent(this, TeachersActivity.class))
+        );
+
+        cardSubject.setOnClickListener(v ->
+                startActivity(new Intent(this, SubjectsActivity.class))
+        );
+
+        cardTimetable.setOnClickListener(v ->
+                startActivity(new Intent(this, TimetableActivity.class))
         );
 
         btnLogout.setOnClickListener(v -> {

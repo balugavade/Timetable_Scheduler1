@@ -2,7 +2,6 @@ package com.example.timetablescheduler;
 
 import android.content.Intent;
 import android.os.Bundle;
-import android.view.View;
 import android.widget.*;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.widget.Toolbar;
@@ -153,7 +152,7 @@ public class BatchActivity extends AppCompatActivity {
         timetableConfig.put("batches", batchData);
         timetableConfig.saveInBackground(e -> {
             if(e == null) {
-                startActivity(new Intent(this, TimetableGeneratorActivity.class));
+                startActivity(new Intent(this, TimetableActivity.class));
                 finish();
             } else {
                 Toast.makeText(this, "Save failed: " + e.getMessage(), Toast.LENGTH_LONG).show();

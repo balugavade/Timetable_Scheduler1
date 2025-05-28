@@ -23,7 +23,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-public class TimetableGeneratorActivity extends AppCompatActivity {
+public class TimetableActivity extends AppCompatActivity {
 
     private Button btnGenerateTimetable, btnGeneratePDF, btnFinish;
     private ProgressBar progressBar;
