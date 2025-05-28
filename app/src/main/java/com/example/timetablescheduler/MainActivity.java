@@ -4,18 +4,14 @@ import android.content.Intent;
 import android.os.Bundle;
 import android.widget.Button;
 import android.widget.EditText;
-import android.widget.TextView;
 import android.widget.Toast;
-
 import androidx.appcompat.app.AppCompatActivity;
-
 import com.parse.ParseUser;
 
 public class MainActivity extends AppCompatActivity {
 
     private EditText etEmail, etPassword;
-    private Button btnLogin;
-    private TextView tvSignup;
+    private Button btnLogin, btnSignup;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -25,12 +21,11 @@ public class MainActivity extends AppCompatActivity {
         etEmail = findViewById(R.id.editTextText);
         etPassword = findViewById(R.id.editTextText2);
         btnLogin = findViewById(R.id.button1);
-        tvSignup = findViewById(R.id.textView4);
+        btnSignup = findViewById(R.id.btnSignup);
 
         btnLogin.setOnClickListener(v -> handleLogin());
-        tvSignup.setOnClickListener(v -> {
+        btnSignup.setOnClickListener(v -> {
             startActivity(new Intent(this, SignupActivity.class));
-            finish();
         });
 
         // Auto-login if user exists

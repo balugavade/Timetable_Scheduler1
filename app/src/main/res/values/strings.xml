@@ -1,4 +1,5 @@
 <resources>
     <string name="app_name">Timetable Scheduler</string>
+    <string name="teacher_prompt">Select Teacher</string>
 
 </resources>
