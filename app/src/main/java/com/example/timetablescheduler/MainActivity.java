@@ -65,7 +65,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void navigateToWelcome() {
-        startActivity(new Intent(this, WellcomeActivity.class));
+        startActivity(new Intent(this, WelcomeActivity.class));
         finish();
     }
 
