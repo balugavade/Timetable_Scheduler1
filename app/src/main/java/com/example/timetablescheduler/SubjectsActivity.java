@@ -5,7 +5,6 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.widget.*;
 import androidx.appcompat.app.AppCompatActivity;
-import androidx.appcompat.widget.Toolbar;
 import androidx.cardview.widget.CardView;
 import com.parse.ParseObject;
 import com.parse.ParseQuery;
@@ -27,10 +26,6 @@ public class SubjectsActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_subjects);
 
-        Toolbar toolbar = findViewById(R.id.toolbar);
-        setSupportActionBar(toolbar);
-        toolbar.setNavigationOnClickListener(v -> onBackPressed());
-
         layoutSubjectsContainer = findViewById(R.id.layoutSubjectsContainer);
         btnEditSubjects = findViewById(R.id.btnEditSubjects);
         btnSaveSubjects = findViewById(R.id.btnSaveSubjects);
@@ -45,20 +40,18 @@ public class SubjectsActivity extends AppCompatActivity {
     }
 
     private void fetchTeachersAndSubjects() {
-        // Fetch teachers first
-        ParseQuery<ParseObject> teacherQuery = ParseQuery.getQuery("Teacher");
-        teacherQuery.whereEqualTo("user", ParseUser.getCurrentUser());
-        teacherQuery.findInBackground((teachers, e) -> {
+        ParseQuery<ParseObject> query = ParseQuery.getQuery("Teacher");
+        query.whereEqualTo("user", ParseUser.getCurrentUser());
+        query.findInBackground((objects, e) -> {
             teachersList.clear();
             if (e == null) {
-                for (ParseObject teacher : teachers) {
+                for (ParseObject obj : objects) {
                     HashMap<String, String> map = new HashMap<>();
-                    map.put("objectId", teacher.getObjectId());
-                    map.put("name", teacher.getString("name"));
+                    map.put("objectId", obj.getObjectId());
+                    map.put("name", obj.getString("name"));
                     teachersList.add(map);
                 }
             }
-            // Now fetch subjects
             fetchSubjectsFromBack4App();
         });
     }
@@ -99,19 +92,26 @@ public class SubjectsActivity extends AppCompatActivity {
         EditText etLabs = card.findViewById(R.id.etLabsWeekly);
         ImageButton btnDelete = card.findViewById(R.id.btnDeleteSubject);
 
+        // Lab CheckBox logic
+        cbLab.setOnCheckedChangeListener((buttonView, isChecked) -> {
+            etLabs.setEnabled(!isChecked);
+            etLabs.setText(isChecked ? "2" : "0");
+        });
+
         // Populate fields
         etName.setText(name != null ? name : "");
-        cbLab.setChecked(lab);
         etLectures.setText(lectures != null ? lectures : "");
         etSemester.setText(semester != null ? semester : "");
-        etLabs.setText(labs != null ? labs : "");
+        cbLab.setChecked(lab);
+        etLabs.setText(lab ? "2" : (labs != null ? labs : "0"));
+        etLabs.setEnabled(!lab);
 
-        // Setup teacher spinner
+        // Teacher spinner setup
         List<String> teacherNames = new ArrayList<>();
         int selectedIndex = 0;
         for (int i = 0; i < teachersList.size(); i++) {
             teacherNames.add(teachersList.get(i).get("name"));
-            if (teachersList.get(i).get("objectId").equals(teacherId)) {
+            if (teacherId != null && teacherId.equals(teachersList.get(i).get("objectId"))) {
                 selectedIndex = i;
             }
         }
@@ -120,7 +120,7 @@ public class SubjectsActivity extends AppCompatActivity {
         spinnerTeacher.setAdapter(adapter);
         if (!teacherNames.isEmpty()) spinnerTeacher.setSelection(selectedIndex);
 
-        // Delete button handling
+        // Delete button
         btnDelete.setVisibility(isEditMode ? View.VISIBLE : View.GONE);
         btnDelete.setOnClickListener(v -> {
             layoutSubjectsContainer.removeView(card);
@@ -140,6 +140,10 @@ public class SubjectsActivity extends AppCompatActivity {
         for (View card : subjectViews) {
             ImageButton btnDelete = card.findViewById(R.id.btnDeleteSubject);
             btnDelete.setVisibility(isEditMode ? View.VISIBLE : View.GONE);
+
+            CheckBox cbLab = card.findViewById(R.id.cbLab);
+            EditText etLabs = card.findViewById(R.id.etLabsWeekly);
+            etLabs.setEnabled(!cbLab.isChecked());
         }
         btnEditSubjects.setText(isEditMode ? "Done Editing" : "Edit Subjects");
     }
@@ -153,35 +157,42 @@ public class SubjectsActivity extends AppCompatActivity {
             EditText etSemester = card.findViewById(R.id.etSemester);
             EditText etLabs = card.findViewById(R.id.etLabsWeekly);
 
-            String objectId = (String) card.getTag();
             String name = etName.getText().toString().trim();
             String teacherId = teachersList.get(spinnerTeacher.getSelectedItemPosition()).get("objectId");
             boolean lab = cbLab.isChecked();
             String lectures = etLectures.getText().toString().trim();
             String semester = etSemester.getText().toString().trim();
-            String labs = etLabs.getText().toString().trim();
+            String labs = lab ? "2" : etLabs.getText().toString().trim(); // Force 2 if lab
 
-            if (objectId != null) {
-                // Update existing
-                ParseObject subject = ParseObject.createWithoutData("Subject", objectId);
-                subject.put("name", name);
-                subject.put("teacher", ParseObject.createWithoutData("Teacher", teacherId));
-                subject.put("lab", lab);
-                subject.put("lecturesWeekly", lectures);
-                subject.put("semester", semester);
-                subject.put("labsWeekly", labs);
-                subject.saveInBackground();
-            } else {
-                // Create new
-                ParseObject subject = new ParseObject("Subject");
-                subject.put("user", ParseUser.getCurrentUser());
-                subject.put("name", name);
-                subject.put("teacher", ParseObject.createWithoutData("Teacher", teacherId));
-                subject.put("lab", lab);
-                subject.put("lecturesWeekly", lectures);
-                subject.put("semester", semester);
-                subject.put("labsWeekly", labs);
-                subject.saveInBackground();
+            String objectId = (String) card.getTag();
+
+            if (!name.isEmpty()) {
+                if (objectId != null) {
+                    // Update existing subject
+                    ParseQuery<ParseObject> query = ParseQuery.getQuery("Subject");
+                    query.getInBackground(objectId, (obj, e) -> {
+                        if (e == null) {
+                            obj.put("name", name);
+                            obj.put("teacher", ParseObject.createWithoutData("Teacher", teacherId));
+                            obj.put("lab", lab);
+                            obj.put("lecturesWeekly", lectures);
+                            obj.put("semester", semester);
+                            obj.put("labsWeekly", lab ? "2" : "0"); // Enforce 2-hour labs
+                            obj.saveInBackground();
+                        }
+                    });
+                } else {
+                    // Create new subject
+                    ParseObject subject = new ParseObject("Subject");
+                    subject.put("user", ParseUser.getCurrentUser());
+                    subject.put("name", name);
+                    subject.put("teacher", ParseObject.createWithoutData("Teacher", teacherId));
+                    subject.put("lab", lab);
+                    subject.put("lecturesWeekly", lectures);
+                    subject.put("semester", semester);
+                    subject.put("labsWeekly", lab ? "2" : "0"); // Enforce 2-hour labs
+                    subject.saveInBackground();
+                }
             }
         }
         Toast.makeText(this, "Subjects saved!", Toast.LENGTH_SHORT).show();

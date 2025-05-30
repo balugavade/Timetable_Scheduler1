@@ -14,13 +14,15 @@
         android:label="@string/app_name"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
-
         android:theme="@style/Theme.TimetableScheduler">
         <activity
-            android:name=".SubjectsActivity"
+            android:name=".TimetableActivity"
             android:exported="false" />
         <activity
-            android:name=".TimetableActivity"
+            android:name=".Timetable"
+            android:exported="false" />
+        <activity
+            android:name=".SubjectsActivity"
             android:exported="false" />
         <activity
             android:name=".BatchActivity"
