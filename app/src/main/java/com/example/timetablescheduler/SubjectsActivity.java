@@ -1,7 +1,6 @@
 package com.example.timetablescheduler;
 
 import android.os.Bundle;
-import android.view.LayoutInflater;
 import android.view.View;
 import android.widget.*;
 import androidx.appcompat.app.AppCompatActivity;
@@ -16,12 +15,17 @@ import java.util.List;
 
 public class SubjectsActivity extends AppCompatActivity {
 
-    private LinearLayout layoutSubjectsContainer;
-    private Button btnEditSubjects, btnSaveSubjects;
+    private Spinner spinnerSubjects, spinnerTeacher, spinnerSemester;
     private FloatingActionButton fabAddSubject;
-    private boolean isEditMode = false;
-    private List<View> subjectViews = new ArrayList<>();
+    private EditText etSubjectName, etLecturesWeekly, etLabsWeekly;
+    private CheckBox cbLab;
+    private Button btnSaveSubject;
+    private CardView cardSubjectDetail;
+
+    private List<ParseObject> subjectList = new ArrayList<>();
     private List<ParseObject> teachersList = new ArrayList<>();
+    private ArrayAdapter<String> subjectAdapter, teacherAdapter, semesterAdapter;
+    private int selectedSubjectIndex = -1;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -32,14 +36,38 @@ public class SubjectsActivity extends AppCompatActivity {
         setSupportActionBar(toolbar);
         toolbar.setNavigationOnClickListener(v -> onBackPressed());
 
-        layoutSubjectsContainer = findViewById(R.id.layoutSubjectsContainer);
-        btnEditSubjects = findViewById(R.id.btnEditSubjects);
-        btnSaveSubjects = findViewById(R.id.btnSaveSubjects);
+        spinnerSubjects = findViewById(R.id.spinnerSubjects);
         fabAddSubject = findViewById(R.id.fabAddSubject);
+        cardSubjectDetail = findViewById(R.id.cardSubjectDetail);
 
-        btnEditSubjects.setOnClickListener(v -> toggleEditMode());
-        btnSaveSubjects.setOnClickListener(v -> saveSubjectsToBack4App());
-        fabAddSubject.setOnClickListener(v -> addSubjectField(null, null, null, null, null, false, null));
+        etSubjectName = findViewById(R.id.etSubjectName);
+        spinnerTeacher = findViewById(R.id.spinnerTeacher);
+        spinnerSemester = findViewById(R.id.spinnerSemester);
+        cbLab = findViewById(R.id.cbLab);
+        etLecturesWeekly = findViewById(R.id.etLecturesWeekly);
+        etLabsWeekly = findViewById(R.id.etLabsWeekly);
+        btnSaveSubject = findViewById(R.id.btnSaveSubject);
+
+        // Semester spinner setup
+        String[] semesters = {"I", "II", "III", "IV", "V", "VI", "VII", "VIII"};
+        semesterAdapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item, semesters);
+        semesterAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        spinnerSemester.setAdapter(semesterAdapter);
+
+        cbLab.setOnCheckedChangeListener((buttonView, checked) -> etLabsWeekly.setEnabled(checked));
+
+        fabAddSubject.setOnClickListener(v -> showAddSubject());
+
+        btnSaveSubject.setOnClickListener(v -> saveSubject());
+
+        spinnerSubjects.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override
+            public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                showSubjectDetails(position);
+            }
+            @Override
+            public void onNothingSelected(AdapterView<?> parent) {}
+        });
 
         fetchTeachersFromBack4App();
     }
@@ -51,6 +79,7 @@ public class SubjectsActivity extends AppCompatActivity {
             if (e == null) {
                 teachersList.clear();
                 teachersList.addAll(objects);
+                updateTeacherSpinner();
                 fetchSubjectsFromBack4App();
             } else {
                 Toast.makeText(this, "Error fetching teachers: " + e.getMessage(), Toast.LENGTH_SHORT).show();
@@ -58,28 +87,29 @@ public class SubjectsActivity extends AppCompatActivity {
         });
     }
 
-    private void fetchSubjectsFromBack4App() {
-        layoutSubjectsContainer.removeAllViews();
-        subjectViews.clear();
+    private void updateTeacherSpinner() {
+        List<String> names = new ArrayList<>();
+        for (ParseObject teacher : teachersList) {
+            names.add(teacher.getString("name"));
+        }
+        teacherAdapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item, names);
+        teacherAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        spinnerTeacher.setAdapter(teacherAdapter);
+    }
 
+    private void fetchSubjectsFromBack4App() {
         ParseQuery<ParseObject> query = ParseQuery.getQuery("Subject");
         query.whereEqualTo("user", ParseUser.getCurrentUser());
+        query.include("teacher");
         query.findInBackground((objects, e) -> {
             if (e == null) {
-                if (objects.isEmpty()) {
-                    addSubjectField(null, null, null, null, null, false, null);
+                subjectList.clear();
+                subjectList.addAll(objects);
+                updateSubjectSpinner();
+                if (!subjectList.isEmpty()) {
+                    showSubjectDetails(0);
                 } else {
-                    for (ParseObject obj : objects) {
-                        addSubjectField(
-                                obj.getString("name"),
-                                obj.getParseObject("teacher"),
-                                obj.getInt("lecturesWeekly") == 0 ? "" : String.valueOf(obj.getInt("lecturesWeekly")),
-                                obj.getString("semester"),
-                                obj.getInt("labsWeekly") == 0 ? "" : String.valueOf(obj.getInt("labsWeekly")),
-                                obj.getBoolean("isLab"),
-                                obj.getObjectId()
-                        );
-                    }
+                    showAddSubject();
                 }
             } else {
                 Toast.makeText(this, "Error fetching subjects: " + e.getMessage(), Toast.LENGTH_SHORT).show();
@@ -87,137 +117,114 @@ public class SubjectsActivity extends AppCompatActivity {
         });
     }
 
-    private void addSubjectField(String name, ParseObject selectedTeacher, String lecturesWeekly, String semester, String labsWeekly, boolean isLab, String objectId) {
-        CardView card = (CardView) LayoutInflater.from(this)
-                .inflate(R.layout.subject_item, layoutSubjectsContainer, false);
+    private void updateSubjectSpinner() {
+        List<String> names = new ArrayList<>();
+        for (ParseObject subject : subjectList) {
+            names.add(subject.getString("name"));
+        }
+        subjectAdapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item, names);
+        subjectAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        spinnerSubjects.setAdapter(subjectAdapter);
+    }
 
-        EditText etSubjectName = card.findViewById(R.id.etSubjectName);
-        Spinner spinnerTeacher = card.findViewById(R.id.spinnerTeacher);
-        Spinner spinnerSemester = card.findViewById(R.id.spinnerSemester);
-        CheckBox cbLab = card.findViewById(R.id.cbLab);
-        EditText etLecturesWeekly = card.findViewById(R.id.etLecturesWeekly);
-        EditText etLabsWeekly = card.findViewById(R.id.etLabsWeekly);
-        ImageButton btnDelete = card.findViewById(R.id.btnDeleteSubject);
+    private void showSubjectDetails(int position) {
+        if (position < 0 || position >= subjectList.size()) return;
+        selectedSubjectIndex = position;
+        ParseObject subject = subjectList.get(position);
 
-        // Set values
-        etSubjectName.setText(name != null ? name : "");
-        etLecturesWeekly.setText(lecturesWeekly != null ? lecturesWeekly : "");
-        etLabsWeekly.setText(labsWeekly != null ? labsWeekly : "");
-        cbLab.setChecked(isLab);
+        etSubjectName.setText(subject.getString("name"));
+        cbLab.setChecked(subject.has("isLab") && subject.getBoolean("isLab"));
+        etLecturesWeekly.setText(subject.has("lecturesWeekly") ? String.valueOf(subject.getNumber("lecturesWeekly")) : "");
+        etLabsWeekly.setText(subject.has("labsWeekly") ? String.valueOf(subject.getNumber("labsWeekly")) : "");
 
-        // Teacher spinner setup
-        ArrayAdapter<String> teacherAdapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item, getTeacherNames());
-        teacherAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
-        spinnerTeacher.setAdapter(teacherAdapter);
-
-        // Set selected teacher if editing
-        if (selectedTeacher != null) {
+        // Set teacher spinner
+        ParseObject teacher = subject.getParseObject("teacher");
+        if (teacher != null) {
             for (int i = 0; i < teachersList.size(); i++) {
-                if (teachersList.get(i).getObjectId().equals(selectedTeacher.getObjectId())) {
+                if (teachersList.get(i).getObjectId().equals(teacher.getObjectId())) {
                     spinnerTeacher.setSelection(i);
                     break;
                 }
             }
+        } else if (!teachersList.isEmpty()) {
+            spinnerTeacher.setSelection(0);
         }
 
-        // Semester spinner setup (I–VIII)
-        String[] semesters = {"I", "II", "III", "IV", "V", "VI", "VII", "VIII"};
-        ArrayAdapter<String> semesterAdapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item, semesters);
-        semesterAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
-        spinnerSemester.setAdapter(semesterAdapter);
-
-        // Set selected semester if editing
+        // Set semester spinner
+        String semester = subject.getString("semester");
         if (semester != null) {
             int pos = semesterAdapter.getPosition(semester);
             if (pos >= 0) spinnerSemester.setSelection(pos);
+        } else {
+            spinnerSemester.setSelection(0);
         }
 
-        // Show/hide labsWeekly field depending on isLab
-        etLabsWeekly.setEnabled(isLab);
-        cbLab.setOnCheckedChangeListener((buttonView, checked) -> etLabsWeekly.setEnabled(checked));
-
-        btnDelete.setVisibility(isEditMode ? View.VISIBLE : View.GONE);
-        btnDelete.setOnClickListener(v -> {
-            layoutSubjectsContainer.removeView(card);
-            subjectViews.remove(card);
-            if (objectId != null) {
-                ParseObject obj = ParseObject.createWithoutData("Subject", objectId);
-                obj.deleteInBackground();
-            }
-        });
-
-        card.setTag(objectId);
-        layoutSubjectsContainer.addView(card);
-        subjectViews.add(card);
+        btnSaveSubject.setText("Save");
     }
 
-    private List<String> getTeacherNames() {
-        List<String> names = new ArrayList<>();
-        for (ParseObject teacher : teachersList) {
-            names.add(teacher.getString("name"));
+    private void showAddSubject() {
+        selectedSubjectIndex = -1;
+        etSubjectName.setText("");
+        cbLab.setChecked(false);
+        etLecturesWeekly.setText("");
+        etLabsWeekly.setText("");
+        spinnerTeacher.setSelection(0);
+        spinnerSemester.setSelection(0);
+        btnSaveSubject.setText("Add");
+    }
+
+    private void saveSubject() {
+        String name = etSubjectName.getText().toString().trim();
+        int teacherPos = spinnerTeacher.getSelectedItemPosition();
+        ParseObject teacher = teacherPos >= 0 && teacherPos < teachersList.size() ? teachersList.get(teacherPos) : null;
+        String semester = spinnerSemester.getSelectedItem().toString();
+        boolean isLab = cbLab.isChecked();
+        String lecturesWeeklyStr = etLecturesWeekly.getText().toString().trim();
+        String labsWeeklyStr = etLabsWeekly.getText().toString().trim();
+
+        int lecturesWeekly = lecturesWeeklyStr.isEmpty() ? 0 : Integer.parseInt(lecturesWeeklyStr);
+        int labsWeekly = labsWeeklyStr.isEmpty() ? 0 : Integer.parseInt(labsWeeklyStr);
+
+        if (name.isEmpty() || teacher == null) {
+            Toast.makeText(this, "Please fill all fields and select a teacher", Toast.LENGTH_SHORT).show();
+            return;
         }
-        return names;
-    }
 
-    private void toggleEditMode() {
-        isEditMode = !isEditMode;
-        for (View card : subjectViews) {
-            ImageButton btnDelete = card.findViewById(R.id.btnDeleteSubject);
-            btnDelete.setVisibility(isEditMode ? View.VISIBLE : View.GONE);
-        }
-        btnEditSubjects.setText(isEditMode ? "Done Editing" : "Edit Subjects");
-    }
-
-    private void saveSubjectsToBack4App() {
-        for (View card : subjectViews) {
-            EditText etSubjectName = card.findViewById(R.id.etSubjectName);
-            Spinner spinnerTeacher = card.findViewById(R.id.spinnerTeacher);
-            Spinner spinnerSemester = card.findViewById(R.id.spinnerSemester);
-            CheckBox cbLab = card.findViewById(R.id.cbLab);
-            EditText etLecturesWeekly = card.findViewById(R.id.etLecturesWeekly);
-            EditText etLabsWeekly = card.findViewById(R.id.etLabsWeekly);
-
-            String name = etSubjectName.getText().toString().trim();
-            int teacherPos = spinnerTeacher.getSelectedItemPosition();
-            ParseObject teacher = teacherPos >= 0 && teacherPos < teachersList.size() ? teachersList.get(teacherPos) : null;
-            String selectedSemester = spinnerSemester.getSelectedItem().toString();
-            boolean isLab = cbLab.isChecked();
-            String lecturesWeeklyStr = etLecturesWeekly.getText().toString().trim();
-            String labsWeeklyStr = etLabsWeekly.getText().toString().trim();
-            String objectId = (String) card.getTag();
-
-            int lecturesWeekly = lecturesWeeklyStr.isEmpty() ? 0 : Integer.parseInt(lecturesWeeklyStr);
-            int labsWeekly = labsWeeklyStr.isEmpty() ? 0 : Integer.parseInt(labsWeeklyStr);
-
-            if (!name.isEmpty()) {
-                if (objectId != null) {
-                    // Update existing subject
-                    ParseQuery<ParseObject> query = ParseQuery.getQuery("Subject");
-                    query.getInBackground(objectId, (obj, e) -> {
-                        if (e == null && obj != null) {
-                            obj.put("name", name);
-                            obj.put("teacher", teacher);
-                            obj.put("semester", selectedSemester);
-                            obj.put("isLab", isLab);
-                            obj.put("lecturesWeekly", lecturesWeekly);
-                            obj.put("labsWeekly", labsWeekly);
-                            obj.saveInBackground();
-                        }
-                    });
+        if (selectedSubjectIndex >= 0 && selectedSubjectIndex < subjectList.size()) {
+            // Update existing subject
+            ParseObject subject = subjectList.get(selectedSubjectIndex);
+            subject.put("name", name);
+            subject.put("teacher", teacher);
+            subject.put("semester", semester);
+            subject.put("isLab", isLab);
+            subject.put("lecturesWeekly", lecturesWeekly);
+            subject.put("labsWeekly", labsWeekly);
+            subject.saveInBackground(e -> {
+                if (e == null) {
+                    Toast.makeText(this, "Subject updated!", Toast.LENGTH_SHORT).show();
+                    fetchSubjectsFromBack4App();
                 } else {
-                    // Create new subject
-                    ParseObject subject = new ParseObject("Subject");
-                    subject.put("user", ParseUser.getCurrentUser());
-                    subject.put("name", name);
-                    subject.put("teacher", teacher);
-                    subject.put("semester", selectedSemester);
-                    subject.put("isLab", isLab);
-                    subject.put("lecturesWeekly", lecturesWeekly);
-                    subject.put("labsWeekly", labsWeekly);
-                    subject.saveInBackground();
+                    Toast.makeText(this, "Error: " + e.getMessage(), Toast.LENGTH_SHORT).show();
                 }
-            }
+            });
+        } else {
+            // Add new subject
+            ParseObject subject = new ParseObject("Subject");
+            subject.put("user", ParseUser.getCurrentUser());
+            subject.put("name", name);
+            subject.put("teacher", teacher);
+            subject.put("semester", semester);
+            subject.put("isLab", isLab);
+            subject.put("lecturesWeekly", lecturesWeekly);
+            subject.put("labsWeekly", labsWeekly);
+            subject.saveInBackground(e -> {
+                if (e == null) {
+                    Toast.makeText(this, "Subject added!", Toast.LENGTH_SHORT).show();
+                    fetchSubjectsFromBack4App();
+                } else {
+                    Toast.makeText(this, "Error: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+                }
+            });
         }
-        Toast.makeText(this, "Subjects saved!", Toast.LENGTH_SHORT).show();
     }
 }
