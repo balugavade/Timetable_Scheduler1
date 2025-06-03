@@ -19,9 +19,6 @@
             android:name=".TimetableActivity"
             android:exported="false" />
         <activity
-            android:name=".Timetable"
-            android:exported="false" />
-        <activity
             android:name=".SubjectsActivity"
             android:exported="false" />
         <activity
