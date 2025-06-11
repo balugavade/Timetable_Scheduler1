@@ -16,7 +16,7 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.TimetableScheduler">
         <activity
-            android:name=".TimetableActivity"
+            android:name=".Timetable"
             android:exported="false" />
         <activity
             android:name=".SubjectsActivity"

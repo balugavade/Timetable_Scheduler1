@@ -42,7 +42,7 @@ public class BatchActivity extends AppCompatActivity {
         btnGenerateBatches.setOnClickListener(v -> generateBatchFields());
         btnSave.setOnClickListener(v -> saveBatchesToBack4App());
         btnNext.setOnClickListener(v -> {
-            Intent intent = new Intent(BatchActivity.this, TimetableActivity.class);
+            Intent intent = new Intent(BatchActivity.this, Timetable.class);
             startActivity(intent);
             finish();
         });
