@@ -1,164 +1,169 @@
 package com.example.timetablescheduler;
 
 import android.os.Bundle;
+import android.text.TextUtils;
 import android.view.View;
 import android.widget.*;
 import androidx.appcompat.app.AppCompatActivity;
-import androidx.appcompat.widget.Toolbar;
-import androidx.cardview.widget.CardView;
-import com.google.android.material.floatingactionbutton.FloatingActionButton;
-import com.parse.ParseObject;
-import com.parse.ParseQuery;
-import com.parse.ParseUser;
+import com.parse.*;
+import com.google.android.material.textfield.TextInputEditText;
 import java.util.ArrayList;
 import java.util.List;
 
 public class TeachersActivity extends AppCompatActivity {
 
     private Spinner spinnerTeachers;
-    private FloatingActionButton fabAddTeacher;
-    private EditText etTeacherName, etTeacherPosition, etTeacherLoad, etTeacherSubjects, etTeacherDepartment;
-    private Button btnSaveTeacher;
-    private CardView cardTeacherDetail;
-
+    private TextInputEditText etTeacherName, etTeacherPosition, etTeacherLoad, etSubjects, etTeacherDepartment;
+    private Button btnDeleteTeacher;
     private List<ParseObject> teacherList = new ArrayList<>();
-    private ArrayAdapter<String> teacherAdapter;
-    private int selectedTeacherIndex = -1;
+    private ParseObject selectedTeacher;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_teachers);
 
-        Toolbar toolbar = findViewById(R.id.toolbar);
-        setSupportActionBar(toolbar);
-        toolbar.setNavigationOnClickListener(v -> onBackPressed());
-
+        // Initialize views
         spinnerTeachers = findViewById(R.id.spinnerTeachers);
-        fabAddTeacher = findViewById(R.id.fabAddTeacher);
-        cardTeacherDetail = findViewById(R.id.cardTeacherDetail);
-
         etTeacherName = findViewById(R.id.etTeacherName);
         etTeacherPosition = findViewById(R.id.etTeacherPosition);
         etTeacherLoad = findViewById(R.id.etTeacherLoad);
-        etTeacherSubjects = findViewById(R.id.etTeacherSubjects);
+        etSubjects = findViewById(R.id.etSubjects);
         etTeacherDepartment = findViewById(R.id.etTeacherDepartment);
-        btnSaveTeacher = findViewById(R.id.btnSaveTeacher);
+        btnDeleteTeacher = findViewById(R.id.btnDeleteTeacher);
 
-        fabAddTeacher.setOnClickListener(v -> showAddTeacher());
+        // Setup listeners
+        setupSpinner();
+        setupButtonListeners();
+        fetchTeachers();
+    }
 
-        btnSaveTeacher.setOnClickListener(v -> saveTeacher());
-
+    private void setupSpinner() {
         spinnerTeachers.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
             @Override
             public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
-                showTeacherDetails(position);
-            }
-            @Override
-            public void onNothingSelected(AdapterView<?> parent) {}
-        });
-
-        fetchTeachersFromBack4App();
-    }
-
-    private void fetchTeachersFromBack4App() {
-        ParseQuery<ParseObject> query = ParseQuery.getQuery("Teacher");
-        query.whereEqualTo("user", ParseUser.getCurrentUser());
-        query.findInBackground((objects, e) -> {
-            if (e == null) {
-                teacherList.clear();
-                teacherList.addAll(objects);
-                updateTeacherSpinner();
-                if (!teacherList.isEmpty()) {
-                    showTeacherDetails(0);
-                } else {
-                    showAddTeacher();
+                if (position >= 0 && position < teacherList.size()) {
+                    selectedTeacher = teacherList.get(position);
+                    populateTeacherData(selectedTeacher);
+                    btnDeleteTeacher.setVisibility(View.VISIBLE);
                 }
-            } else {
-                Toast.makeText(this, "Error fetching teachers: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+            }
+
+            @Override
+            public void onNothingSelected(AdapterView<?> parent) {
+                clearForm();
+                btnDeleteTeacher.setVisibility(View.GONE);
             }
         });
     }
 
-    private void updateTeacherSpinner() {
-        List<String> names = new ArrayList<>();
-        for (ParseObject teacher : teacherList) {
-            names.add(teacher.getString("name"));
-        }
-        teacherAdapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item, names);
-        teacherAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
-        spinnerTeachers.setAdapter(teacherAdapter);
-    }
-
-    private void showTeacherDetails(int position) {
-        if (position < 0 || position >= teacherList.size()) return;
-        selectedTeacherIndex = position;
-        ParseObject teacher = teacherList.get(position);
-
+    private void populateTeacherData(ParseObject teacher) {
         etTeacherName.setText(teacher.getString("name"));
         etTeacherPosition.setText(teacher.getString("position"));
         etTeacherLoad.setText(teacher.getString("load"));
-        etTeacherSubjects.setText(teacher.getString("subjects"));
         etTeacherDepartment.setText(teacher.getString("department"));
-        btnSaveTeacher.setText("Save");
+
+        List<String> subjects = teacher.getList("subjects");
+        if (subjects != null) {
+            etSubjects.setText(TextUtils.join(", ", subjects));
+        }
     }
 
-    private void showAddTeacher() {
-        selectedTeacherIndex = -1;
+    private void clearForm() {
         etTeacherName.setText("");
         etTeacherPosition.setText("");
         etTeacherLoad.setText("");
-        etTeacherSubjects.setText("");
+        etSubjects.setText("");
         etTeacherDepartment.setText("");
-        btnSaveTeacher.setText("Add");
-        spinnerTeachers.setSelection(-1);
+        selectedTeacher = null;
+        btnDeleteTeacher.setVisibility(View.GONE);
+    }
+
+    private void setupButtonListeners() {
+        findViewById(R.id.btnSaveTeacher).setOnClickListener(v -> saveTeacher());
+        findViewById(R.id.btnDeleteTeacher).setOnClickListener(v -> deleteTeacher());
+        findViewById(R.id.fabAddTeacher).setOnClickListener(v -> clearForm());
     }
 
     private void saveTeacher() {
         String name = etTeacherName.getText().toString().trim();
         String position = etTeacherPosition.getText().toString().trim();
         String load = etTeacherLoad.getText().toString().trim();
-        String subjects = etTeacherSubjects.getText().toString().trim();
         String department = etTeacherDepartment.getText().toString().trim();
+        String subjects = etSubjects.getText().toString().trim();
 
-        if (name.isEmpty()) {
-            Toast.makeText(this, "Name is required", Toast.LENGTH_SHORT).show();
+        if (name.isEmpty() || position.isEmpty() || load.isEmpty()) {
+            Toast.makeText(this, "Please fill required fields", Toast.LENGTH_SHORT).show();
             return;
         }
 
-        if (selectedTeacherIndex >= 0 && selectedTeacherIndex < teacherList.size()) {
-            // Update existing teacher
-            ParseObject teacher = teacherList.get(selectedTeacherIndex);
-            teacher.put("name", name);
-            teacher.put("position", position);
-            teacher.put("load", load);
-            teacher.put("subjects", subjects);
-            teacher.put("department", department);
-            teacher.saveInBackground(e -> {
-                if (e == null) {
-                    Toast.makeText(this, "Teacher updated!", Toast.LENGTH_SHORT).show();
-                    fetchTeachersFromBack4App();
-                } else {
-                    Toast.makeText(this, "Error: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+        ParseObject teacher = (selectedTeacher != null) ? selectedTeacher : new ParseObject("Teacher");
+        teacher.put("user", ParseUser.getCurrentUser());
+        teacher.put("name", name);
+        teacher.put("position", position);
+        teacher.put("load", load);
+        teacher.put("department", department);
+
+        // Process subjects
+        List<String> subjectsList = new ArrayList<>();
+        if (!subjects.isEmpty()) {
+            String[] subjectsArray = subjects.split(",");
+            for (String subject : subjectsArray) {
+                String trimmed = subject.trim();
+                if (!trimmed.isEmpty()) {
+                    subjectsList.add(trimmed);
                 }
-            });
-        } else {
-            // Add new teacher
-            ParseObject teacher = new ParseObject("Teacher");
-            teacher.put("user", ParseUser.getCurrentUser());
-            teacher.put("name", name);
-            teacher.put("position", position);
-            teacher.put("load", load);
-            teacher.put("subjects", subjects);
-            teacher.put("department", department);
-            teacher.saveInBackground(e -> {
+            }
+        }
+        teacher.put("subjects", subjectsList);
+
+        teacher.saveInBackground(e -> {
+            if (e == null) {
+                Toast.makeText(this, "Teacher saved!", Toast.LENGTH_SHORT).show();
+                fetchTeachers();
+                clearForm();
+            } else {
+                Toast.makeText(this, "Error: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+            }
+        });
+    }
+
+    private void deleteTeacher() {
+        if (selectedTeacher != null) {
+            selectedTeacher.deleteInBackground(e -> {
                 if (e == null) {
-                    Toast.makeText(this, "Teacher added!", Toast.LENGTH_SHORT).show();
-                    fetchTeachersFromBack4App();
+                    Toast.makeText(this, "Teacher deleted", Toast.LENGTH_SHORT).show();
+                    fetchTeachers();
+                    clearForm();
                 } else {
-                    Toast.makeText(this, "Error: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+                    Toast.makeText(this, "Delete failed: " + e.getMessage(), Toast.LENGTH_SHORT).show();
                 }
             });
         }
+    }
+
+    private void fetchTeachers() {
+        ParseQuery<ParseObject> query = ParseQuery.getQuery("Teacher");
+        query.whereEqualTo("user", ParseUser.getCurrentUser());
+        query.findInBackground((teachers, e) -> {
+            if (e == null) {
+                teacherList = teachers;
+                updateTeacherSpinner();
+            } else {
+                Toast.makeText(this, "Error loading teachers", Toast.LENGTH_SHORT).show();
+            }
+        });
+    }
+
+    private void updateTeacherSpinner() {
+        List<String> teacherNames = new ArrayList<>();
+        for (ParseObject teacher : teacherList) {
+            teacherNames.add(teacher.getString("name"));
+        }
+
+        ArrayAdapter<String> adapter = new ArrayAdapter<>(
+                this, android.R.layout.simple_spinner_item, teacherNames);
+        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        spinnerTeachers.setAdapter(adapter);
     }
 }

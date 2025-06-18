@@ -16,7 +16,7 @@ import java.util.List;
 
 public class BatchActivity extends AppCompatActivity {
 
-    private RadioGroup rgCourseLevel;
+    // REMOVED: private RadioGroup rgCourseLevel;
     private EditText etDepartment, etTotalBatches;
     private Button btnGenerateBatches, btnSave, btnNext;
     private LinearLayout layoutBatchesContainer;
@@ -30,7 +30,7 @@ public class BatchActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_batch);
 
-        rgCourseLevel = findViewById(R.id.rgCourseLevel);
+        // REMOVED: rgCourseLevel = findViewById(R.id.rgCourseLevel);
         etDepartment = findViewById(R.id.etDepartment);
         etTotalBatches = findViewById(R.id.etTotalBatches);
         btnGenerateBatches = findViewById(R.id.btnGenerateBatches);
@@ -42,7 +42,7 @@ public class BatchActivity extends AppCompatActivity {
         btnGenerateBatches.setOnClickListener(v -> generateBatchFields());
         btnSave.setOnClickListener(v -> saveBatchesToBack4App());
         btnNext.setOnClickListener(v -> {
-            Intent intent = new Intent(BatchActivity.this, Timetable.class);
+            Intent intent = new Intent(BatchActivity.this, TimetableActivity.class);
             startActivity(intent);
             finish();
         });
@@ -166,17 +166,14 @@ public class BatchActivity extends AppCompatActivity {
     }
 
     private void saveBatchesToBack4App() {
-        String courseLevel = "";
-        int selectedId = rgCourseLevel.getCheckedRadioButtonId();
-        if (selectedId == R.id.rbUG) {
-            courseLevel = "UG";
-        } else if (selectedId == R.id.rbPG) {
-            courseLevel = "PG";
-        }
+        // REMOVED: String courseLevel = "";
+        // REMOVED: int selectedId = rgCourseLevel.getCheckedRadioButtonId();
+        // REMOVED: if (selectedId == R.id.rbUG) { ... }
+        // REMOVED: else if (selectedId == R.id.rbPG) { ... }
 
         String department = etDepartment.getText().toString().trim();
 
-        if (courseLevel.isEmpty() || department.isEmpty()) {
+        if (department.isEmpty()) {
             Toast.makeText(this, "Please fill all required fields", Toast.LENGTH_SHORT).show();
             return;
         }
@@ -196,7 +193,7 @@ public class BatchActivity extends AppCompatActivity {
             if (!batchName.isEmpty() && !academicYear.isEmpty()) {
                 ParseObject batch = new ParseObject("Batch");
                 batch.put("user", ParseUser.getCurrentUser());
-                batch.put("courseLevel", courseLevel);
+                // REMOVED: batch.put("courseLevel", courseLevel);
                 batch.put("department", department);
                 batch.put("batchName", batchName);
                 batch.put("sections", sections);

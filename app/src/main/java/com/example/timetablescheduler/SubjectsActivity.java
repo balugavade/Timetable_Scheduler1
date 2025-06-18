@@ -11,15 +11,16 @@ import com.parse.ParseObject;
 import com.parse.ParseQuery;
 import com.parse.ParseUser;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 
 public class SubjectsActivity extends AppCompatActivity {
 
     private Spinner spinnerSubjects, spinnerTeacher, spinnerSemester;
     private FloatingActionButton fabAddSubject;
-    private EditText etSubjectName, etLecturesWeekly, etLabsWeekly;
+    private EditText etSubjectCode, etSubjectName, etLecturesWeekly, etLabsWeekly;
     private CheckBox cbLab;
-    private Button btnSaveSubject;
+    private Button btnSaveSubject, btnDeleteSubject;
     private CardView cardSubjectDetail;
 
     private List<ParseObject> subjectList = new ArrayList<>();
@@ -40,6 +41,7 @@ public class SubjectsActivity extends AppCompatActivity {
         fabAddSubject = findViewById(R.id.fabAddSubject);
         cardSubjectDetail = findViewById(R.id.cardSubjectDetail);
 
+        etSubjectCode = findViewById(R.id.etSubjectCode);
         etSubjectName = findViewById(R.id.etSubjectName);
         spinnerTeacher = findViewById(R.id.spinnerTeacher);
         spinnerSemester = findViewById(R.id.spinnerSemester);
@@ -47,9 +49,10 @@ public class SubjectsActivity extends AppCompatActivity {
         etLecturesWeekly = findViewById(R.id.etLecturesWeekly);
         etLabsWeekly = findViewById(R.id.etLabsWeekly);
         btnSaveSubject = findViewById(R.id.btnSaveSubject);
+        btnDeleteSubject = findViewById(R.id.btnDeleteSubject);
 
-        // Semester spinner setup
-        String[] semesters = {"I", "II", "III", "IV", "V", "VI", "VII", "VIII"};
+        // Only I-IV in Roman numerals
+        String[] semesters = {"I", "II", "III", "IV"};
         semesterAdapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item, semesters);
         semesterAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
         spinnerSemester.setAdapter(semesterAdapter);
@@ -57,8 +60,8 @@ public class SubjectsActivity extends AppCompatActivity {
         cbLab.setOnCheckedChangeListener((buttonView, checked) -> etLabsWeekly.setEnabled(checked));
 
         fabAddSubject.setOnClickListener(v -> showAddSubject());
-
         btnSaveSubject.setOnClickListener(v -> saveSubject());
+        btnDeleteSubject.setOnClickListener(v -> deleteSubject());
 
         spinnerSubjects.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
             @Override
@@ -119,8 +122,13 @@ public class SubjectsActivity extends AppCompatActivity {
 
     private void updateSubjectSpinner() {
         List<String> names = new ArrayList<>();
+        HashSet<String> seen = new HashSet<>();
         for (ParseObject subject : subjectList) {
-            names.add(subject.getString("name"));
+            String name = subject.getString("name");
+            if (name != null && !seen.contains(name)) {
+                names.add(name);
+                seen.add(name);
+            }
         }
         subjectAdapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item, names);
         subjectAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
@@ -132,12 +140,12 @@ public class SubjectsActivity extends AppCompatActivity {
         selectedSubjectIndex = position;
         ParseObject subject = subjectList.get(position);
 
+        etSubjectCode.setText(subject.has("code") ? subject.getString("code") : "");
         etSubjectName.setText(subject.getString("name"));
         cbLab.setChecked(subject.has("isLab") && subject.getBoolean("isLab"));
         etLecturesWeekly.setText(subject.has("lecturesWeekly") ? String.valueOf(subject.getNumber("lecturesWeekly")) : "");
         etLabsWeekly.setText(subject.has("labsWeekly") ? String.valueOf(subject.getNumber("labsWeekly")) : "");
 
-        // Set teacher spinner
         ParseObject teacher = subject.getParseObject("teacher");
         if (teacher != null) {
             for (int i = 0; i < teachersList.size(); i++) {
@@ -150,7 +158,6 @@ public class SubjectsActivity extends AppCompatActivity {
             spinnerTeacher.setSelection(0);
         }
 
-        // Set semester spinner
         String semester = subject.getString("semester");
         if (semester != null) {
             int pos = semesterAdapter.getPosition(semester);
@@ -160,10 +167,12 @@ public class SubjectsActivity extends AppCompatActivity {
         }
 
         btnSaveSubject.setText("Save");
+        btnDeleteSubject.setVisibility(View.VISIBLE);
     }
 
     private void showAddSubject() {
         selectedSubjectIndex = -1;
+        etSubjectCode.setText("");
         etSubjectName.setText("");
         cbLab.setChecked(false);
         etLecturesWeekly.setText("");
@@ -171,9 +180,11 @@ public class SubjectsActivity extends AppCompatActivity {
         spinnerTeacher.setSelection(0);
         spinnerSemester.setSelection(0);
         btnSaveSubject.setText("Add");
+        btnDeleteSubject.setVisibility(View.GONE);
     }
 
     private void saveSubject() {
+        String code = etSubjectCode.getText().toString().trim();
         String name = etSubjectName.getText().toString().trim();
         int teacherPos = spinnerTeacher.getSelectedItemPosition();
         ParseObject teacher = teacherPos >= 0 && teacherPos < teachersList.size() ? teachersList.get(teacherPos) : null;
@@ -185,14 +196,14 @@ public class SubjectsActivity extends AppCompatActivity {
         int lecturesWeekly = lecturesWeeklyStr.isEmpty() ? 0 : Integer.parseInt(lecturesWeeklyStr);
         int labsWeekly = labsWeeklyStr.isEmpty() ? 0 : Integer.parseInt(labsWeeklyStr);
 
-        if (name.isEmpty() || teacher == null) {
+        if (code.isEmpty() || name.isEmpty() || teacher == null) {
             Toast.makeText(this, "Please fill all fields and select a teacher", Toast.LENGTH_SHORT).show();
             return;
         }
 
         if (selectedSubjectIndex >= 0 && selectedSubjectIndex < subjectList.size()) {
-            // Update existing subject
             ParseObject subject = subjectList.get(selectedSubjectIndex);
+            subject.put("code", code);
             subject.put("name", name);
             subject.put("teacher", teacher);
             subject.put("semester", semester);
@@ -208,9 +219,9 @@ public class SubjectsActivity extends AppCompatActivity {
                 }
             });
         } else {
-            // Add new subject
             ParseObject subject = new ParseObject("Subject");
             subject.put("user", ParseUser.getCurrentUser());
+            subject.put("code", code);
             subject.put("name", name);
             subject.put("teacher", teacher);
             subject.put("semester", semester);
@@ -223,6 +234,21 @@ public class SubjectsActivity extends AppCompatActivity {
                     fetchSubjectsFromBack4App();
                 } else {
                     Toast.makeText(this, "Error: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+                }
+            });
+        }
+    }
+
+    private void deleteSubject() {
+        if (selectedSubjectIndex >= 0 && selectedSubjectIndex < subjectList.size()) {
+            ParseObject subject = subjectList.get(selectedSubjectIndex);
+            subject.deleteInBackground(e -> {
+                if (e == null) {
+                    Toast.makeText(this, "Subject deleted", Toast.LENGTH_SHORT).show();
+                    fetchSubjectsFromBack4App();
+                    showAddSubject();
+                } else {
+                    Toast.makeText(this, "Delete failed: " + e.getMessage(), Toast.LENGTH_SHORT).show();
                 }
             });
         }
