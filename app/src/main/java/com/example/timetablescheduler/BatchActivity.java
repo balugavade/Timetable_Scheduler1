@@ -1,12 +1,12 @@
 package com.example.timetablescheduler;
 
-import android.content.Intent;
 import android.os.Bundle;
 import android.view.View;
 import android.widget.*;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.cardview.widget.CardView;
 import com.google.android.material.textfield.TextInputEditText;
+import com.google.android.material.textfield.TextInputLayout;
 import com.parse.ParseObject;
 import com.parse.ParseQuery;
 import com.parse.ParseUser;
@@ -20,7 +20,11 @@ public class BatchActivity extends AppCompatActivity {
     private LinearLayout layoutBatchesContainer;
     private TextView tvBatchesHeader;
 
-    private List<View> batchContainers = new ArrayList<>();
+    private List<View> batchCards = new ArrayList<>();
+
+    // These lists will be filled from your backend (Parse)
+    private List<String> allSubjects = new ArrayList<>();
+    private List<String> allTeachers = new ArrayList<>();
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -36,38 +40,66 @@ public class BatchActivity extends AppCompatActivity {
         tvBatchesHeader = findViewById(R.id.tvBatchesHeader);
 
         btnGenerateBatches.setOnClickListener(v -> generateBatchFields());
-        btnSave.setOnClickListener(v -> saveBatchConfiguration());
-        btnNext.setOnClickListener(v -> navigateToTimetableGeneration());
+
+        // Load subjects and teachers from Parse when activity starts
+        loadSubjectsAndTeachers();
+    }
+
+    private void loadSubjectsAndTeachers() {
+        // Load subjects
+        ParseQuery<ParseObject> subjectQuery = ParseQuery.getQuery("Subject");
+        subjectQuery.whereEqualTo("user", ParseUser.getCurrentUser());
+        subjectQuery.findInBackground((subjects, e) -> {
+            if (e == null) {
+                allSubjects.clear();
+                for (ParseObject obj : subjects) {
+                    String name = obj.getString("name");
+                    if (name != null) allSubjects.add(name);
+                }
+            }
+        });
+
+        // Load teachers
+        ParseQuery<ParseObject> teacherQuery = ParseQuery.getQuery("Teacher");
+        teacherQuery.whereEqualTo("user", ParseUser.getCurrentUser());
+        teacherQuery.findInBackground((teachers, e) -> {
+            if (e == null) {
+                allTeachers.clear();
+                for (ParseObject obj : teachers) {
+                    String name = obj.getString("name");
+                    if (name != null) allTeachers.add(name);
+                }
+            }
+        });
     }
 
     private void generateBatchFields() {
         String totalBatchesText = etTotalBatches.getText().toString().trim();
         if (totalBatchesText.isEmpty()) {
-            showToast("Please enter total number of batches");
+            Toast.makeText(this, "Please enter total number of batches", Toast.LENGTH_SHORT).show();
             return;
         }
 
         int totalBatches = Integer.parseInt(totalBatchesText);
         layoutBatchesContainer.removeAllViews();
-        batchContainers.clear();
+        batchCards.clear();
         tvBatchesHeader.setVisibility(View.VISIBLE);
 
         for (int i = 1; i <= totalBatches; i++) {
-            View batchContainer = createBatchContainer(i);
-            layoutBatchesContainer.addView(batchContainer);
-            batchContainers.add(batchContainer);
+            View batchCard = createBatchCard(i);
+            layoutBatchesContainer.addView(batchCard);
+            batchCards.add(batchCard);
         }
     }
 
-    private View createBatchContainer(int batchNumber) {
+    private View createBatchCard(int batchNumber) {
         CardView cardView = new CardView(this);
         cardView.setCardElevation(8f);
-        cardView.setRadius(18f);
+        cardView.setRadius(16f);
         cardView.setUseCompatPadding(true);
-        cardView.setCardBackgroundColor(getResources().getColor(android.R.color.white));
         LinearLayout.LayoutParams cardParams = new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-        cardParams.setMargins(0, 16, 0, 16);
+        cardParams.setMargins(0, 0, 0, 24);
         cardView.setLayoutParams(cardParams);
 
         LinearLayout container = new LinearLayout(this);
@@ -79,64 +111,78 @@ public class BatchActivity extends AppCompatActivity {
         tvBatchTitle.setText("Batch " + batchNumber);
         tvBatchTitle.setTextSize(20f);
         tvBatchTitle.setTextColor(getResources().getColor(R.color.purple_500));
+        tvBatchTitle.setTypeface(tvBatchTitle.getTypeface(), android.graphics.Typeface.BOLD);
         tvBatchTitle.setPadding(0, 0, 0, 16);
         container.addView(tvBatchTitle);
 
-        // Batch Name Input
+        // Batch Name
+        TextInputLayout tilBatchName = new TextInputLayout(this, null, com.google.android.material.R.style.Widget_MaterialComponents_TextInputLayout_OutlinedBox);
+        tilBatchName.setHint("Batch Name");
         TextInputEditText etBatchName = new TextInputEditText(this);
-        etBatchName.setHint("Batch Name");
-        etBatchName.setId(View.generateViewId());
-        container.addView(etBatchName);
+        tilBatchName.addView(etBatchName);
+        tilBatchName.setLayoutParams(new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+        container.addView(tilBatchName);
 
         // Sections Label
         TextView tvSectionsLabel = new TextView(this);
         tvSectionsLabel.setText("Sections");
-        tvSectionsLabel.setPadding(0, 24, 0, 8);
         tvSectionsLabel.setTextSize(16f);
+        tvSectionsLabel.setTypeface(tvSectionsLabel.getTypeface(), android.graphics.Typeface.BOLD);
+        tvSectionsLabel.setPadding(0, 24, 0, 8);
         container.addView(tvSectionsLabel);
 
         // Sections Checkboxes
         LinearLayout sectionsLayout = new LinearLayout(this);
         sectionsLayout.setOrientation(LinearLayout.HORIZONTAL);
-
         CheckBox cbSectionA = new CheckBox(this);
         cbSectionA.setText("Section A");
-        cbSectionA.setId(View.generateViewId());
         sectionsLayout.addView(cbSectionA);
-
         CheckBox cbSectionB = new CheckBox(this);
         cbSectionB.setText("Section B");
-        cbSectionB.setId(View.generateViewId());
         sectionsLayout.addView(cbSectionB);
-
         container.addView(sectionsLayout);
 
-        // Academic Year Input
+        // Academic Year
+        TextInputLayout tilAcademicYear = new TextInputLayout(this, null, com.google.android.material.R.style.Widget_MaterialComponents_TextInputLayout_OutlinedBox);
+        tilAcademicYear.setHint("Academic Year (e.g., 2024-25)");
         TextInputEditText etAcademicYear = new TextInputEditText(this);
-        etAcademicYear.setHint("Academic Year (e.g., 2024-25)");
-        etAcademicYear.setId(View.generateViewId());
-        etAcademicYear.setPadding(0, 24, 0, 0);
-        container.addView(etAcademicYear);
+        tilAcademicYear.addView(etAcademicYear);
+        tilAcademicYear.setLayoutParams(new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+        container.addView(tilAcademicYear);
 
-        // Total Subjects Input
+        // Add extra space between Academic Year and Total Number of Subjects
+        Space space = new Space(this);
+        LinearLayout.LayoutParams spaceParams = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, 24);
+        space.setLayoutParams(spaceParams);
+        container.addView(space);
+
+        // Total Number of Subjects
+        TextInputLayout tilTotalSubjects = new TextInputLayout(this, null, com.google.android.material.R.style.Widget_MaterialComponents_TextInputLayout_OutlinedBox);
+        tilTotalSubjects.setHint("Total Number of Subjects");
         TextInputEditText etTotalSubjects = new TextInputEditText(this);
-        etTotalSubjects.setHint("Total Number of Subjects");
         etTotalSubjects.setInputType(android.text.InputType.TYPE_CLASS_NUMBER);
-        etTotalSubjects.setId(View.generateViewId());
-        etTotalSubjects.setPadding(0, 24, 0, 0);
-        container.addView(etTotalSubjects);
+        tilTotalSubjects.addView(etTotalSubjects);
+        tilTotalSubjects.setLayoutParams(new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+        container.addView(tilTotalSubjects);
 
         // Generate Subject Fields Button
         Button btnGenerateSubjects = new Button(this);
         btnGenerateSubjects.setText("Generate Subject Fields");
-        btnGenerateSubjects.setId(View.generateViewId());
-        btnGenerateSubjects.setPadding(0, 16, 0, 0);
+        btnGenerateSubjects.setBackgroundColor(getResources().getColor(R.color.purple_500));
+        btnGenerateSubjects.setTextColor(getResources().getColor(android.R.color.white));
+        LinearLayout.LayoutParams btnParams = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        btnParams.setMargins(0, 24, 0, 0);
+        btnGenerateSubjects.setLayoutParams(btnParams);
         container.addView(btnGenerateSubjects);
 
-        // Subject Container
+        // Subject fields container
         LinearLayout subjectContainer = new LinearLayout(this);
         subjectContainer.setOrientation(LinearLayout.VERTICAL);
-        subjectContainer.setId(View.generateViewId());
         container.addView(subjectContainer);
 
         btnGenerateSubjects.setOnClickListener(v -> {
@@ -161,85 +207,22 @@ public class BatchActivity extends AppCompatActivity {
 
             Spinner spinnerSubject = new Spinner(this);
             spinnerSubject.setLayoutParams(new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1));
+            ArrayAdapter<String> subjectAdapter = new ArrayAdapter<>(this,
+                    android.R.layout.simple_spinner_item, allSubjects);
+            subjectAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+            spinnerSubject.setAdapter(subjectAdapter);
 
             Spinner spinnerTeacher = new Spinner(this);
             spinnerTeacher.setLayoutParams(new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1));
-
-            // TODO: Populate spinners with actual data (subjects and teachers)
+            ArrayAdapter<String> teacherAdapter = new ArrayAdapter<>(this,
+                    android.R.layout.simple_spinner_item, allTeachers);
+            teacherAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+            spinnerTeacher.setAdapter(teacherAdapter);
 
             row.addView(spinnerSubject);
             row.addView(spinnerTeacher);
 
             subjectContainer.addView(row);
         }
-    }
-
-    private void saveBatchConfiguration() {
-        String department = etDepartment.getText().toString().trim();
-        if (department.isEmpty()) {
-            showToast("Please enter department");
-            return;
-        }
-        if (batchContainers.isEmpty()) {
-            showToast("Please generate batch fields");
-            return;
-        }
-
-        List<ParseObject> batches = new ArrayList<>();
-
-        for (View batchView : batchContainers) {
-            LinearLayout container = (LinearLayout) ((CardView) batchView).getChildAt(0);
-
-            TextInputEditText etBatchName = (TextInputEditText) container.getChildAt(1);
-            String batchName = etBatchName.getText().toString().trim();
-            if (batchName.isEmpty()) {
-                showToast("Please enter batch name");
-                return;
-            }
-
-            LinearLayout sectionsLayout = (LinearLayout) container.getChildAt(2);
-            CheckBox cbSectionA = (CheckBox) sectionsLayout.getChildAt(0);
-            CheckBox cbSectionB = (CheckBox) sectionsLayout.getChildAt(1);
-
-            List<String> sections = new ArrayList<>();
-            if (cbSectionA.isChecked()) sections.add("A");
-            if (cbSectionB.isChecked()) sections.add("B");
-            if (sections.isEmpty()) {
-                showToast("Please select at least one section");
-                return;
-            }
-
-            TextInputEditText etAcademicYear = (TextInputEditText) container.getChildAt(3);
-            String academicYear = etAcademicYear.getText().toString().trim();
-
-            ParseObject batch = new ParseObject("Batch");
-            batch.put("user", ParseUser.getCurrentUser());
-            batch.put("department", department);
-            batch.put("batchName", batchName);
-            batch.put("sections", sections);
-            batch.put("academicYear", academicYear);
-
-            // TODO: Save subjects and teachers assigned to this batch if needed
-
-            batches.add(batch);
-        }
-
-        ParseObject.saveAllInBackground(batches, e -> {
-            if (e == null) {
-                showToast("Batch configuration saved successfully!");
-            } else {
-                showToast("Error saving batches: " + e.getMessage());
-            }
-        });
-    }
-
-    private void navigateToTimetableGeneration() {
-        saveBatchConfiguration();
-        Intent intent = new Intent(this, TimetableGenerationActivity.class);
-        startActivity(intent);
-    }
-
-    private void showToast(String message) {
-        Toast.makeText(this, message, Toast.LENGTH_SHORT).show();
     }
 }

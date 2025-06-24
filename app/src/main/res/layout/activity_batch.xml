@@ -21,11 +21,12 @@
             android:layout_gravity="center_horizontal"
             android:layout_marginBottom="24dp"/>
 
+        <!-- Department Field -->
         <com.google.android.material.textfield.TextInputLayout
+            style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:hint="Department"
-            style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
             android:layout_marginBottom="16dp">
 
             <com.google.android.material.textfield.TextInputEditText
@@ -35,11 +36,12 @@
                 android:inputType="text" />
         </com.google.android.material.textfield.TextInputLayout>
 
+        <!-- Total Number of Batches Field -->
         <com.google.android.material.textfield.TextInputLayout
+            style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:hint="Total Number of Batches"
-            style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
             android:layout_marginBottom="16dp">
 
             <com.google.android.material.textfield.TextInputEditText
@@ -51,13 +53,13 @@
 
         <Button
             android:id="@+id/btnGenerateBatches"
-            android:layout_width="wrap_content"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="Generate Batch Fields"
-            android:layout_gravity="end"
-            android:layout_marginBottom="16dp"
             android:backgroundTint="@color/purple_500"
-            android:textColor="@android:color/white" />
+            android:textColor="@android:color/white"
+            android:layout_marginBottom="24dp"
+            android:layout_marginTop="8dp"/>
 
         <TextView
             android:id="@+id/tvBatchesHeader"
@@ -69,6 +71,7 @@
             android:layout_marginBottom="12dp"
             android:visibility="gone" />
 
+        <!-- Container for dynamically generated batch cards -->
         <LinearLayout
             android:id="@+id/layoutBatchesContainer"
             android:layout_width="match_parent"
