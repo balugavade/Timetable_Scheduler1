@@ -63,10 +63,9 @@ public class TeachersActivity extends AppCompatActivity {
         etTeacherLoad.setText(teacher.getString("load"));
         etTeacherDepartment.setText(teacher.getString("department"));
 
-        List<String> subjects = teacher.getList("subjects");
-        if (subjects != null) {
-            etSubjects.setText(TextUtils.join(", ", subjects));
-        }
+        // FIX: Retrieve as string instead of list
+        String subjects = teacher.getString("subjects");
+        etSubjects.setText(subjects != null ? subjects : "");
     }
 
     private void clearForm() {
@@ -104,18 +103,8 @@ public class TeachersActivity extends AppCompatActivity {
         teacher.put("load", load);
         teacher.put("department", department);
 
-        // Process subjects
-        List<String> subjectsList = new ArrayList<>();
-        if (!subjects.isEmpty()) {
-            String[] subjectsArray = subjects.split(",");
-            for (String subject : subjectsArray) {
-                String trimmed = subject.trim();
-                if (!trimmed.isEmpty()) {
-                    subjectsList.add(trimmed);
-                }
-            }
-        }
-        teacher.put("subjects", subjectsList);
+        // FIX: Store subjects as a single comma-separated string
+        teacher.put("subjects", subjects);
 
         teacher.saveInBackground(e -> {
             if (e == null) {

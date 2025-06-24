@@ -21,7 +21,6 @@
             android:layout_gravity="center_horizontal"
             android:layout_marginBottom="24dp"/>
 
-        <!-- Department -->
         <com.google.android.material.textfield.TextInputLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -33,10 +32,9 @@
                 android:id="@+id/etDepartment"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:inputType="text"/>
+                android:inputType="text" />
         </com.google.android.material.textfield.TextInputLayout>
 
-        <!-- Total Number of Batches -->
         <com.google.android.material.textfield.TextInputLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -48,7 +46,7 @@
                 android:id="@+id/etTotalBatches"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:inputType="number"/>
+                android:inputType="number" />
         </com.google.android.material.textfield.TextInputLayout>
 
         <Button
@@ -57,9 +55,10 @@
             android:layout_height="wrap_content"
             android:text="Generate Batch Fields"
             android:layout_gravity="end"
-            android:layout_marginBottom="16dp"/>
+            android:layout_marginBottom="16dp"
+            android:backgroundTint="@color/purple_500"
+            android:textColor="@android:color/white" />
 
-        <!-- Dynamic Batches Container -->
         <TextView
             android:id="@+id/tvBatchesHeader"
             android:layout_width="wrap_content"
@@ -68,15 +67,14 @@
             android:textStyle="bold"
             android:textSize="18sp"
             android:layout_marginBottom="12dp"
-            android:visibility="gone"/>
+            android:visibility="gone" />
 
         <LinearLayout
             android:id="@+id/layoutBatchesContainer"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="vertical"/>
+            android:orientation="vertical" />
 
-        <!-- Save and Next Buttons -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -90,11 +88,11 @@
                 android:layout_weight="1"
                 android:text="Save"
                 android:backgroundTint="@color/purple_500"
-                android:textColor="@android:color/white"/>
+                android:textColor="@android:color/white" />
 
             <Space
                 android:layout_width="16dp"
-                android:layout_height="wrap_content"/>
+                android:layout_height="wrap_content" />
 
             <Button
                 android:id="@+id/btnNext"
@@ -103,7 +101,7 @@
                 android:layout_weight="1"
                 android:text="Generate Timetable"
                 android:backgroundTint="@color/teal_700"
-                android:textColor="@android:color/white"/>
+                android:textColor="@android:color/white" />
         </LinearLayout>
 
     </LinearLayout>

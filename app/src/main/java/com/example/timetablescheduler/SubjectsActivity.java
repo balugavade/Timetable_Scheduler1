@@ -10,6 +10,7 @@ import com.google.android.material.floatingactionbutton.FloatingActionButton;
 import com.parse.ParseObject;
 import com.parse.ParseQuery;
 import com.parse.ParseUser;
+import com.parse.ParseException;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -51,7 +52,6 @@ public class SubjectsActivity extends AppCompatActivity {
         btnSaveSubject = findViewById(R.id.btnSaveSubject);
         btnDeleteSubject = findViewById(R.id.btnDeleteSubject);
 
-        // Only I-IV in Roman numerals
         String[] semesters = {"I", "II", "III", "IV"};
         semesterAdapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item, semesters);
         semesterAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
@@ -60,7 +60,7 @@ public class SubjectsActivity extends AppCompatActivity {
         cbLab.setOnCheckedChangeListener((buttonView, checked) -> etLabsWeekly.setEnabled(checked));
 
         fabAddSubject.setOnClickListener(v -> showAddSubject());
-        btnSaveSubject.setOnClickListener(v -> saveSubject());
+        btnSaveSubject.setOnClickListener(v -> saveOrUpdateSubject());
         btnDeleteSubject.setOnClickListener(v -> deleteSubject());
 
         spinnerSubjects.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
@@ -183,7 +183,10 @@ public class SubjectsActivity extends AppCompatActivity {
         btnDeleteSubject.setVisibility(View.GONE);
     }
 
-    private void saveSubject() {
+    /**
+     * Save or update subject: checks for existing subject by code+user and updates if found, else creates new.
+     */
+    private void saveOrUpdateSubject() {
         String code = etSubjectCode.getText().toString().trim();
         String name = etSubjectName.getText().toString().trim();
         int teacherPos = spinnerTeacher.getSelectedItemPosition();
@@ -201,42 +204,48 @@ public class SubjectsActivity extends AppCompatActivity {
             return;
         }
 
-        if (selectedSubjectIndex >= 0 && selectedSubjectIndex < subjectList.size()) {
-            ParseObject subject = subjectList.get(selectedSubjectIndex);
-            subject.put("code", code);
-            subject.put("name", name);
-            subject.put("teacher", teacher);
-            subject.put("semester", semester);
-            subject.put("isLab", isLab);
-            subject.put("lecturesWeekly", lecturesWeekly);
-            subject.put("labsWeekly", labsWeekly);
-            subject.saveInBackground(e -> {
-                if (e == null) {
-                    Toast.makeText(this, "Subject updated!", Toast.LENGTH_SHORT).show();
-                    fetchSubjectsFromBack4App();
-                } else {
-                    Toast.makeText(this, "Error: " + e.getMessage(), Toast.LENGTH_SHORT).show();
-                }
-            });
-        } else {
-            ParseObject subject = new ParseObject("Subject");
-            subject.put("user", ParseUser.getCurrentUser());
-            subject.put("code", code);
-            subject.put("name", name);
-            subject.put("teacher", teacher);
-            subject.put("semester", semester);
-            subject.put("isLab", isLab);
-            subject.put("lecturesWeekly", lecturesWeekly);
-            subject.put("labsWeekly", labsWeekly);
-            subject.saveInBackground(e -> {
-                if (e == null) {
-                    Toast.makeText(this, "Subject added!", Toast.LENGTH_SHORT).show();
-                    fetchSubjectsFromBack4App();
-                } else {
-                    Toast.makeText(this, "Error: " + e.getMessage(), Toast.LENGTH_SHORT).show();
-                }
-            });
-        }
+        // Query for existing subject with same code for this user
+        ParseQuery<ParseObject> query = ParseQuery.getQuery("Subject");
+        query.whereEqualTo("user", ParseUser.getCurrentUser());
+        query.whereEqualTo("code", code);
+        query.getFirstInBackground((existingSubject, e) -> {
+            if (e == null && existingSubject != null) {
+                // Update existing
+                existingSubject.put("name", name);
+                existingSubject.put("teacher", teacher);
+                existingSubject.put("semester", semester);
+                existingSubject.put("isLab", isLab);
+                existingSubject.put("lecturesWeekly", lecturesWeekly);
+                existingSubject.put("labsWeekly", labsWeekly);
+                existingSubject.saveInBackground(err -> {
+                    if (err == null) {
+                        Toast.makeText(this, "Subject updated!", Toast.LENGTH_SHORT).show();
+                        fetchSubjectsFromBack4App();
+                    } else {
+                        Toast.makeText(this, "Error: " + err.getMessage(), Toast.LENGTH_SHORT).show();
+                    }
+                });
+            } else {
+                // Create new subject
+                ParseObject subject = new ParseObject("Subject");
+                subject.put("user", ParseUser.getCurrentUser());
+                subject.put("code", code);
+                subject.put("name", name);
+                subject.put("teacher", teacher);
+                subject.put("semester", semester);
+                subject.put("isLab", isLab);
+                subject.put("lecturesWeekly", lecturesWeekly);
+                subject.put("labsWeekly", labsWeekly);
+                subject.saveInBackground(err -> {
+                    if (err == null) {
+                        Toast.makeText(this, "Subject added!", Toast.LENGTH_SHORT).show();
+                        fetchSubjectsFromBack4App();
+                    } else {
+                        Toast.makeText(this, "Error: " + err.getMessage(), Toast.LENGTH_SHORT).show();
+                    }
+                });
+            }
+        });
     }
 
     private void deleteSubject() {
