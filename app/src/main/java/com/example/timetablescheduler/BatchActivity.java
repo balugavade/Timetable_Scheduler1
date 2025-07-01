@@ -10,7 +10,6 @@ import androidx.cardview.widget.CardView;
 import com.google.android.material.textfield.TextInputEditText;
 import com.parse.*;
 import java.util.*;
-import com.example.timetablescheduler.TimetableGenerationActivity;
 
 public class BatchActivity extends AppCompatActivity {
 
@@ -28,7 +27,6 @@ public class BatchActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_batch);
 
-        // Initialize UI components
         etDepartment = findViewById(R.id.etDepartment);
         etTotalBatches = findViewById(R.id.etTotalBatches);
         btnGenerateBatches = findViewById(R.id.btnGenerateBatches);
@@ -37,27 +35,23 @@ public class BatchActivity extends AppCompatActivity {
         layoutBatchesContainer = findViewById(R.id.layoutBatchesContainer);
         tvBatchesHeader = findViewById(R.id.tvBatchesHeader);
 
-        // Set click listeners
         btnGenerateBatches.setOnClickListener(v -> generateBatchCards());
         btnSave.setOnClickListener(v -> saveBatchData());
-
-        // CORRECTED NAVIGATION - Goes to TimetableGenerationActivity
         btnNext.setOnClickListener(v -> {
             saveBatchData();
             if (validateBatchData()) {
-                // Explicit navigation to TimetableGenerationActivity
-                startActivity(new Intent(BatchActivity.this, TimetableGenerationActivity.class));
+                Intent intent = new Intent(BatchActivity.this, TimetableGenerationActivity.class);
+                intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK | Intent.FLAG_ACTIVITY_NEW_TASK);
+                startActivity(intent);
             } else {
-                Toast.makeText(this, "Complete batch configurations", Toast.LENGTH_SHORT).show();
+                Toast.makeText(this, "Complete all batch configurations", Toast.LENGTH_SHORT).show();
             }
         });
 
-        // Load data
         fetchSubjectsAndTeachers();
     }
 
     private void fetchSubjectsAndTeachers() {
-        // Fetch subjects
         ParseQuery<ParseObject> subjectQuery = ParseQuery.getQuery("Subject");
         subjectQuery.whereEqualTo("user", ParseUser.getCurrentUser());
         subjectQuery.findInBackground((subjects, e1) -> {
@@ -69,7 +63,6 @@ public class BatchActivity extends AppCompatActivity {
             }
         });
 
-        // Fetch teachers
         ParseQuery<ParseObject> teacherQuery = ParseQuery.getQuery("Teacher");
         teacherQuery.whereEqualTo("user", ParseUser.getCurrentUser());
         teacherQuery.findInBackground((teachers, e2) -> {

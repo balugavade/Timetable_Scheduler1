@@ -15,39 +15,26 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/Theme.TimetableScheduler">
-        <activity
-            android:name=".TimetableDisplayActivity"
-            android:exported="false" />
-        <activity
-            android:name=".TimetableGenerationActivity"
-            android:exported="false" />
-        <activity
-            android:name=".SubjectsActivity"
-            android:exported="false" />
-        <activity
-            android:name=".BatchActivity"
-            android:exported="false" />
-        <activity
-            android:name=".TeachersActivity"
-            android:windowSoftInputMode="adjustResize" />
-        <activity
-            android:name=".DaysPeriodsActivity"
-            android:windowSoftInputMode="adjustResize" />
-        <activity
-            android:name=".MainActivity"
-            android:exported="true">
+
+        <!-- Activities -->
+        <activity android:name=".TimetableDisplayActivity" android:exported="false" />
+        <activity android:name=".TimetableGenerationActivity" android:exported="false" />
+        <activity android:name=".SubjectsActivity" android:exported="false" />
+        <activity android:name=".BatchActivity" android:exported="false" />
+        <activity android:name=".TeachersActivity" android:windowSoftInputMode="adjustResize" />
+        <activity android:name=".DaysPeriodsActivity" android:windowSoftInputMode="adjustResize" />
+        <activity android:name=".MainActivity" android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
-
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
-        <activity
-            android:name=".SignupActivity"
-            android:exported="false" />
-        <activity
-            android:name=".WelcomeActivity"
-            android:exported="false" />
+        <activity android:name=".SignupActivity" android:exported="false" />
+        <activity android:name=".WelcomeActivity" android:exported="false" />
+
+        <!-- Genetic Algorithm Service -->
+        <service android:name=".GeneticService" android:exported="false" />
+
     </application>
 
 </manifest>

@@ -8,4 +8,7 @@
     <color name="red_500">#F44336</color>
     <color name="green_500">#4CAF50</color>
     <color name="teal_50">#E0F2F1</color>
+    <color name="header_background">#E0E0E0</color>
+    <color name="day_background">#F5F5F5</color>
+    <color name="break_background">#FFEB3B</color>
 </resources>

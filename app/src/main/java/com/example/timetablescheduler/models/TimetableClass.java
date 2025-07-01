@@ -7,7 +7,7 @@ public class TimetableClass implements Cloneable {
     private String section;
     private TimeSlot timeSlot;
     private boolean isLab;
-    private int duration; // 1=lecture, 2=lab
+    private int duration;
 
     public TimetableClass(String subject, String teacher, String batch,
                           String section, TimeSlot timeSlot, boolean isLab, int duration) {
@@ -20,7 +20,6 @@ public class TimetableClass implements Cloneable {
         this.duration = duration;
     }
 
-    // Getters and setters
     public String getSubject() { return subject; }
     public void setSubject(String subject) { this.subject = subject; }
     public String getTeacher() { return teacher; }
@@ -39,9 +38,7 @@ public class TimetableClass implements Cloneable {
     @Override
     public TimetableClass clone() {
         try {
-            TimetableClass copy = (TimetableClass) super.clone();
-            copy.timeSlot = (this.timeSlot != null) ? this.timeSlot.clone() : null;
-            return copy;
+            return (TimetableClass) super.clone();
         } catch (CloneNotSupportedException e) {
             throw new AssertionError();
         }
