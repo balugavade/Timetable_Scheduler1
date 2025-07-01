@@ -5,12 +5,7 @@ import android.view.View;
 import android.widget.*;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.widget.Toolbar;
-import androidx.cardview.widget.CardView;
-import com.google.android.material.floatingactionbutton.FloatingActionButton;
-import com.parse.ParseObject;
-import com.parse.ParseQuery;
-import com.parse.ParseUser;
-import com.parse.ParseException;
+import com.parse.*;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -18,11 +13,11 @@ import java.util.List;
 public class SubjectsActivity extends AppCompatActivity {
 
     private Spinner spinnerSubjects, spinnerTeacher, spinnerSemester;
-    private FloatingActionButton fabAddSubject;
-    private EditText etSubjectCode, etSubjectName, etLecturesWeekly, etLabsWeekly;
+    private com.google.android.material.floatingactionbutton.FloatingActionButton fabAddSubject;
+    private com.google.android.material.textfield.TextInputEditText etSubjectCode, etSubjectName, etLecturesWeekly, etLabsWeekly;
     private CheckBox cbLab;
     private Button btnSaveSubject, btnDeleteSubject;
-    private CardView cardSubjectDetail;
+    private androidx.cardview.widget.CardView cardSubjectDetail;
 
     private List<ParseObject> subjectList = new ArrayList<>();
     private List<ParseObject> teachersList = new ArrayList<>();
@@ -183,9 +178,6 @@ public class SubjectsActivity extends AppCompatActivity {
         btnDeleteSubject.setVisibility(View.GONE);
     }
 
-    /**
-     * Save or update subject: checks for existing subject by code+user and updates if found, else creates new.
-     */
     private void saveOrUpdateSubject() {
         String code = etSubjectCode.getText().toString().trim();
         String name = etSubjectName.getText().toString().trim();
@@ -204,7 +196,6 @@ public class SubjectsActivity extends AppCompatActivity {
             return;
         }
 
-        // Query for existing subject with same code for this user
         ParseQuery<ParseObject> query = ParseQuery.getQuery("Subject");
         query.whereEqualTo("user", ParseUser.getCurrentUser());
         query.whereEqualTo("code", code);

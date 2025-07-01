@@ -292,7 +292,7 @@ public class DaysPeriodsActivity extends AppCompatActivity {
 
     private void navigateToBatchActivity() {
         saveTimetableConfig();
-        startActivity(new Intent(this, BatchActivity.class));
+        startActivity(new Intent(this, com.example.timetablescheduler.BatchActivity.class));
     }
 
     private void showToast(String message) {

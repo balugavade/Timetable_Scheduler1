@@ -22,13 +22,6 @@
             android:name=".TimetableGenerationActivity"
             android:exported="false" />
         <activity
-            android:name=".TimetablePrintActivity"
-            android:exported="false" />
-        <activity
-            android:name=".TimetableActivity"
-            android:exported="false"
-            android:label="@string/timetable_title" />
-        <activity
             android:name=".SubjectsActivity"
             android:exported="false" />
         <activity

@@ -39,6 +39,8 @@ dependencies {
     implementation 'com.github.parse-community.Parse-SDK-Android:parse:1.26.0'
     implementation 'com.google.android.material:material:1.9.0'
     implementation 'com.itextpdf:itext7-core:7.1.15'
+    implementation 'com.google.android.material:material:1.10.0'
+
 
     testImplementation libs.junit
     androidTestImplementation libs.ext.junit
