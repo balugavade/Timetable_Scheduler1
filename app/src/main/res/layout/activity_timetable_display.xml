@@ -2,7 +2,8 @@
 <ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:fillViewport="true">
+    android:fillViewport="true"
+    android:background="@android:color/white">
 
     <HorizontalScrollView
         android:layout_width="match_parent"
@@ -28,7 +29,8 @@
                 android:id="@+id/timetableTable"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:stretchColumns="*"/>
+                android:stretchColumns="*"
+                android:background="@android:color/white"/>
         </LinearLayout>
     </HorizontalScrollView>
 </ScrollView>
