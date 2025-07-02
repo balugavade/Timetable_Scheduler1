@@ -1,12 +1,13 @@
 package com.example.timetablescheduler;
 
 import android.os.Bundle;
+import android.util.TypedValue;
 import android.util.Log;
 import android.widget.TableLayout;
 import android.widget.TableRow;
-import android.widget.TextView;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.content.ContextCompat;
+import androidx.appcompat.widget.AppCompatTextView;
 import com.parse.*;
 import java.util.*;
 
@@ -23,7 +24,6 @@ public class TimetableDisplayActivity extends AppCompatActivity {
     }
 
     private void fetchAndShowTimetable() {
-        // 1. Fetch TimetableConfig for days, periods, breaks
         ParseQuery<ParseObject> configQuery = ParseQuery.getQuery("TimetableConfig");
         configQuery.whereEqualTo("user", ParseUser.getCurrentUser());
         configQuery.orderByDescending("createdAt");
@@ -43,7 +43,6 @@ public class TimetableDisplayActivity extends AppCompatActivity {
             int numDays = workingDays.size();
             int numPeriods = periods.size() + (breaks != null ? breaks.size() : 0);
 
-            // 2. Fetch latest GeneratedTimetable
             ParseQuery<ParseObject> timetableQuery = ParseQuery.getQuery("GeneratedTimetable");
             timetableQuery.whereEqualTo("user", ParseUser.getCurrentUser());
             timetableQuery.orderByDescending("generatedAt");
@@ -51,11 +50,9 @@ public class TimetableDisplayActivity extends AppCompatActivity {
 
             timetableQuery.getFirstInBackground((timetable, e) -> {
                 if (timetable != null) {
-                    // 3. Fetch TimetableEntry objects for this timetable
                     ParseQuery<ParseObject> entryQuery = ParseQuery.getQuery("TimetableEntry");
                     entryQuery.whereEqualTo("timetable", timetable);
                     entryQuery.findInBackground((entries, err) -> {
-                        // Debug: Print workingDays and all entry days
                         Log.d(TAG, "WorkingDays: " + workingDays);
                         for (ParseObject entry : entries) {
                             Log.d(TAG, "Entry: day=" + entry.getString("day") +
@@ -64,20 +61,16 @@ public class TimetableDisplayActivity extends AppCompatActivity {
                                     ", teacher=" + entry.getString("teacher"));
                         }
 
-                        // Map entries to grid: [day][period][subject, teacher]
                         String[][][] data = new String[numDays][numPeriods][2];
                         for (ParseObject entry : entries) {
                             String dayStr = entry.getString("day");
                             int dayIdx = workingDays.indexOf(dayStr);
-                            int periodIdx = entry.getInt("period") - 1; // 1-based to 0-based
-
-                            // Adjust periodIdx if breaks inserted (see below)
+                            int periodIdx = entry.getInt("period") - 1;
                             if (breaks != null && !breaks.isEmpty()) {
                                 periodIdx = getPeriodIndexWithBreaks(periodIdx, breaks);
                             }
                             String subject = entry.getString("subject");
                             String teacher = entry.getString("teacher");
-
                             if (dayIdx >= 0 && dayIdx < numDays && periodIdx >= 0 && periodIdx < numPeriods) {
                                 data[dayIdx][periodIdx][0] = subject;
                                 data[dayIdx][periodIdx][1] = teacher;
@@ -95,7 +88,6 @@ public class TimetableDisplayActivity extends AppCompatActivity {
         });
     }
 
-    // Helper for fallback periods if config is missing
     private List<ParseObject> getDefaultPeriods() {
         List<ParseObject> periods = new ArrayList<>();
         for (int i = 1; i <= 6; i++) {
@@ -108,11 +100,9 @@ public class TimetableDisplayActivity extends AppCompatActivity {
         return periods;
     }
 
-    // Helper to adjust period index if breaks are present
     private int getPeriodIndexWithBreaks(int periodIdx, List<ParseObject> breaks) {
         int offset = 0;
         for (ParseObject br : breaks) {
-            // Defensive: ensure break object is fully fetched
             if (!br.isDataAvailable()) {
                 try { br.fetchIfNeeded(); } catch (Exception e) { Log.e(TAG, "Error fetching break: " + e.getMessage()); }
             }
@@ -125,10 +115,9 @@ public class TimetableDisplayActivity extends AppCompatActivity {
     private void showTimetableGrid(String[][][] timetableData, List<String> workingDays, List<ParseObject> periods, List<ParseObject> breaks) {
         tableLayout.removeAllViews();
 
-        // Build header row (periods + breaks)
         TableRow headerRow = new TableRow(this);
         headerRow.setBackgroundColor(ContextCompat.getColor(this, R.color.header_background));
-        TextView emptyHeader = createHeaderCell("");
+        AppCompatTextView emptyHeader = createHeaderCell("");
         headerRow.addView(emptyHeader);
 
         int periodIdx = 0, breakIdx = 0;
@@ -155,10 +144,9 @@ public class TimetableDisplayActivity extends AppCompatActivity {
         }
         tableLayout.addView(headerRow);
 
-        // Data rows
         for (int day = 0; day < workingDays.size(); day++) {
             TableRow row = new TableRow(this);
-            TextView dayCell = createDayCell(workingDays.get(day));
+            AppCompatTextView dayCell = createDayCell(workingDays.get(day));
             row.addView(dayCell);
 
             periodIdx = 0;
@@ -186,11 +174,11 @@ public class TimetableDisplayActivity extends AppCompatActivity {
         }
     }
 
-    private TextView createHeaderCell(String text) {
-        TextView tv = new TextView(this);
+    private AppCompatTextView createHeaderCell(String text) {
+        AppCompatTextView tv = new AppCompatTextView(this);
         tv.setText(text);
         tv.setPadding(12, 16, 12, 16);
-        tv.setTextSize(14);
+        tv.setTextSize(16);
         tv.setTypeface(tv.getTypeface(), android.graphics.Typeface.BOLD);
         tv.setBackgroundColor(ContextCompat.getColor(this, R.color.header_background));
         tv.setTextColor(ContextCompat.getColor(this, android.R.color.black));
@@ -198,17 +186,17 @@ public class TimetableDisplayActivity extends AppCompatActivity {
         return tv;
     }
 
-    private TextView createBreakHeaderCell(String text) {
-        TextView tv = createHeaderCell(text);
+    private AppCompatTextView createBreakHeaderCell(String text) {
+        AppCompatTextView tv = createHeaderCell(text);
         tv.setBackgroundColor(ContextCompat.getColor(this, R.color.break_background));
         return tv;
     }
 
-    private TextView createDayCell(String dayName) {
-        TextView tv = new TextView(this);
+    private AppCompatTextView createDayCell(String dayName) {
+        AppCompatTextView tv = new AppCompatTextView(this);
         tv.setText(dayName);
         tv.setPadding(16, 20, 16, 20);
-        tv.setTextSize(14);
+        tv.setTextSize(16);
         tv.setTypeface(tv.getTypeface(), android.graphics.Typeface.BOLD);
         tv.setBackgroundColor(ContextCompat.getColor(this, R.color.day_background));
         tv.setTextColor(ContextCompat.getColor(this, android.R.color.black));
@@ -216,12 +204,17 @@ public class TimetableDisplayActivity extends AppCompatActivity {
         return tv;
     }
 
-    private TextView createClassCell(String[] classInfo) {
-        TextView tv = new TextView(this);
-        tv.setMinHeight(100);
+    private AppCompatTextView createClassCell(String[] classInfo) {
+        AppCompatTextView tv = new AppCompatTextView(this);
+        tv.setMinHeight(180);
+        tv.setMinWidth(220);
+        tv.setPadding(16, 16, 16, 16);
         tv.setGravity(android.view.Gravity.CENTER);
         tv.setBackgroundResource(R.drawable.cell_box);
-        tv.setTextSize(13);
+        tv.setTextSize(18);
+        tv.setMaxLines(4);
+        tv.setAutoSizeTextTypeUniformWithConfiguration(12, 20, 2, TypedValue.COMPLEX_UNIT_SP);
+
         if (classInfo != null && classInfo.length == 2 && classInfo[0] != null && classInfo[1] != null) {
             tv.setText(classInfo[0] + "\n" + classInfo[1]);
         } else {
@@ -230,15 +223,17 @@ public class TimetableDisplayActivity extends AppCompatActivity {
         return tv;
     }
 
-    private TextView createBreakCell(String label) {
-        TextView tv = new TextView(this);
+    private AppCompatTextView createBreakCell(String label) {
+        AppCompatTextView tv = new AppCompatTextView(this);
         tv.setText("Break\n" + label);
-        tv.setMinHeight(100);
+        tv.setMinHeight(180);
+        tv.setMinWidth(220);
         tv.setGravity(android.view.Gravity.CENTER);
-        tv.setTextSize(13);
+        tv.setTextSize(16);
         tv.setTypeface(tv.getTypeface(), android.graphics.Typeface.BOLD);
         tv.setBackgroundColor(ContextCompat.getColor(this, R.color.break_background));
         tv.setBackgroundResource(R.drawable.cell_box);
+        tv.setAutoSizeTextTypeUniformWithConfiguration(12, 20, 2, TypedValue.COMPLEX_UNIT_SP);
         return tv;
     }
 }

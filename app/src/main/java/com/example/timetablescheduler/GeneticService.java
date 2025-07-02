@@ -24,6 +24,9 @@ public class GeneticService extends IntentService {
             ParseQuery<ParseObject> configQuery = ParseQuery.getQuery("TimetableConfig");
             configQuery.whereEqualTo("user", user);
             configQuery.orderByDescending("createdAt");
+            configQuery.setLimit(1);
+            configQuery.include("breaks");
+            configQuery.include("periods");
             ParseObject config = configQuery.getFirst();
 
             if (config == null) throw new Exception("No timetable configuration found!");
