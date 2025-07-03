@@ -80,9 +80,10 @@ public class GeneticService extends IntentService {
             batchQuery.whereEqualTo("user", user);
             List<ParseObject> batchObjs = batchQuery.find();
 
-            // 4. Fetch Subjects
+            // 4. Fetch Subjects (INCLUDE TEACHER DATA!)
             ParseQuery<ParseObject> subjectQuery = ParseQuery.getQuery("Subject");
             subjectQuery.whereEqualTo("user", user);
+            subjectQuery.include("teacher"); // <-- THIS FIXES THE ERROR!
             List<ParseObject> subjectObjs = subjectQuery.find();
             Map<String, ParseObject> subjectMap = new HashMap<>();
             for (ParseObject s : subjectObjs) {
@@ -126,6 +127,7 @@ public class GeneticService extends IntentService {
             Individual solution = ga.generateTimetable(classesToSchedule);
 
             // 7. Save the result (pass workingDays for day name mapping)
+            Log.d(TAG, "Saving generated timetable and entries...");
             new ParseRepository().saveTimetable(solution, workingDays);
 
             // 8. Notify UI

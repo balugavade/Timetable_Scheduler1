@@ -1,8 +1,8 @@
 package com.example.timetablescheduler;
 
 import android.os.Bundle;
-import android.util.TypedValue;
 import android.util.Log;
+import android.util.TypedValue;
 import android.widget.TableLayout;
 import android.widget.TableRow;
 import androidx.appcompat.app.AppCompatActivity;
@@ -53,18 +53,20 @@ public class TimetableDisplayActivity extends AppCompatActivity {
                     ParseQuery<ParseObject> entryQuery = ParseQuery.getQuery("TimetableEntry");
                     entryQuery.whereEqualTo("timetable", timetable);
                     entryQuery.findInBackground((entries, err) -> {
-                        Log.d(TAG, "WorkingDays: " + workingDays);
+                        // Debug: Log all entries
+                        Log.d(TAG, "Fetched entries: " + entries.size());
                         for (ParseObject entry : entries) {
-                            Log.d(TAG, "Entry: day=" + entry.getString("day") +
-                                    ", period=" + entry.getInt("period") +
-                                    ", subject=" + entry.getString("subject") +
-                                    ", teacher=" + entry.getString("teacher"));
+                            Log.d(TAG, "Entry: day=" + entry.getString("day")
+                                    + ", period=" + entry.getInt("period")
+                                    + ", subject=" + entry.getString("subject")
+                                    + ", teacher=" + entry.getString("teacher"));
                         }
 
+                        // Map entries to grid
                         String[][][] data = new String[numDays][numPeriods][2];
                         for (ParseObject entry : entries) {
                             String dayStr = entry.getString("day");
-                            int dayIdx = workingDays.indexOf(dayStr);
+                            int dayIdx = workingDays.indexOf(dayStr); // Must match exactly!
                             int periodIdx = entry.getInt("period") - 1;
                             if (breaks != null && !breaks.isEmpty()) {
                                 periodIdx = getPeriodIndexWithBreaks(periodIdx, breaks);
