@@ -83,7 +83,7 @@ public class GeneticService extends IntentService {
             // 4. Fetch Subjects (INCLUDE TEACHER DATA!)
             ParseQuery<ParseObject> subjectQuery = ParseQuery.getQuery("Subject");
             subjectQuery.whereEqualTo("user", user);
-            subjectQuery.include("teacher"); // <-- THIS FIXES THE ERROR!
+            subjectQuery.include("teacher");
             List<ParseObject> subjectObjs = subjectQuery.find();
             Map<String, ParseObject> subjectMap = new HashMap<>();
             for (ParseObject s : subjectObjs) {
@@ -108,13 +108,13 @@ public class GeneticService extends IntentService {
                     // Lectures
                     for (int l = 0; l < lecturesWeekly; l++) {
                         classesToSchedule.add(new TimetableClass(
-                                subjectName, teacherName, batchName, "", null, false, 1
+                                subjectName, teacherName, batchName, "", null, false, 1, lecturesWeekly, labsWeekly
                         ));
                     }
                     // Labs (each lab is 2 periods, so labsWeekly is number of double slots)
                     for (int lab = 0; lab < labsWeekly; lab++) {
                         classesToSchedule.add(new TimetableClass(
-                                subjectName, teacherName, batchName, "", null, true, 2
+                                subjectName, teacherName, batchName, "", null, true, 2, lecturesWeekly, labsWeekly
                         ));
                     }
                 }

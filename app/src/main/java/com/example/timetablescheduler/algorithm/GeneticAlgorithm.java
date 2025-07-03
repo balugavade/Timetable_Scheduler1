@@ -4,20 +4,19 @@ import com.example.timetablescheduler.models.*;
 import java.util.*;
 
 public class GeneticAlgorithm {
-    // Configuration parameters
     private static final int POPULATION_SIZE = 80;
     private static final double CROSSOVER_RATE = 0.8;
     private static final double MUTATION_RATE = 0.10;
     private static final int MAX_GENERATIONS = 200;
-    private static final double FITNESS_THRESHOLD = 0.97;
-    private static final int ELITISM_COUNT = POPULATION_SIZE / 10; // Top 10%
+    private static final double FITNESS_THRESHOLD = 0.98;
+    private static final int ELITISM_COUNT = POPULATION_SIZE / 10;
 
     private final List<TimeSlot> timeSlots;
     private final Map<String, Integer> teacherLoads;
     private final Map<String, List<String>> teacherSubjects;
     private final List<String> teachers;
     private final int periodsPerDay;
-    private final Set<String> breakSlotSet; // e.g., "0_4" for day 0, period 4 is a break
+    private final Set<String> breakSlotSet;
 
     public GeneticAlgorithm(List<TimeSlot> timeSlots, Map<String, Integer> teacherLoads,
                             Map<String, List<String>> teacherSubjects, List<String> teachers,
@@ -36,61 +35,42 @@ public class GeneticAlgorithm {
         int generation = 0;
 
         while (generation < MAX_GENERATIONS) {
-            // Evaluate fitness
             evaluatePopulation(population);
-            Collections.sort(population, (i1, i2) ->
-                    Double.compare(i2.getFitness(), i1.getFitness())); // Descending
-
-            // Update best solution
+            Collections.sort(population, (i1, i2) -> Double.compare(i2.getFitness(), i1.getFitness()));
             Individual currentBest = population.get(0);
             if (bestSolution == null || currentBest.getFitness() > bestSolution.getFitness()) {
                 bestSolution = currentBest.clone();
             }
+            if (bestSolution.getFitness() >= FITNESS_THRESHOLD) break;
 
-            // Check termination condition
-            if (bestSolution.getFitness() >= FITNESS_THRESHOLD) {
-                break;
-            }
-
-            // Create new population
             List<Individual> newPopulation = new ArrayList<>();
-
-            // Elitism: Preserve top individuals
             for (int i = 0; i < ELITISM_COUNT; i++) {
                 newPopulation.add(population.get(i).clone());
             }
-
-            // Fill rest with offspring
             while (newPopulation.size() < POPULATION_SIZE) {
                 Individual parent1 = selectParentRoulette(population);
                 Individual parent2 = selectParentRoulette(population);
-
                 Individual offspring;
                 if (Math.random() < CROSSOVER_RATE) {
                     offspring = crossover(parent1, parent2);
                 } else {
                     offspring = parent1.clone();
                 }
-
-                mutate(offspring);
+                mutate(offspring, classes);
                 newPopulation.add(offspring);
             }
-
             population = newPopulation;
             generation++;
         }
-
         return bestSolution;
     }
 
     private List<Individual> initializePopulation(List<TimetableClass> classes) {
         List<Individual> population = new ArrayList<>();
         Random random = new Random();
-
         for (int i = 0; i < POPULATION_SIZE; i++) {
             Individual individual = new Individual();
             List<TimetableClass> individualClasses = new ArrayList<>();
-
             for (TimetableClass cls : classes) {
                 TimetableClass newCls = new TimetableClass(
                         cls.getSubject(),
@@ -99,7 +79,9 @@ public class GeneticAlgorithm {
                         cls.getSection(),
                         getRandomValidSlot(cls, random),
                         cls.isLab(),
-                        cls.getDuration()
+                        cls.getDuration(),
+                        cls.getWeeklyLectures(),
+                        cls.getWeeklyLabs()
                 );
                 individualClasses.add(newCls);
             }
@@ -110,20 +92,18 @@ public class GeneticAlgorithm {
     }
 
     private TimeSlot getRandomValidSlot(TimetableClass cls, Random random) {
-        // For labs, only allow slots where next period is not a break or end of day
         if (cls.isLab() && cls.getDuration() == 2) {
             List<TimeSlot> validLabSlots = new ArrayList<>();
             for (TimeSlot slot : timeSlots) {
                 if (slot.isBreak()) continue;
-                if (slot.getPeriod() >= periodsPerDay) continue; // Can't start at last period
+                if (slot.getPeriod() >= periodsPerDay) continue;
                 String nextKey = slot.getDay() + "_" + (slot.getPeriod() + 1);
-                if (breakSlotSet.contains(nextKey)) continue; // Next period is a break
+                if (breakSlotSet.contains(nextKey)) continue;
                 validLabSlots.add(slot);
             }
-            if (validLabSlots.isEmpty()) return timeSlots.get(0); // fallback
+            if (validLabSlots.isEmpty()) return timeSlots.get(0);
             return validLabSlots.get(random.nextInt(validLabSlots.size()));
         } else {
-            // For lectures, any non-break slot
             List<TimeSlot> validSlots = new ArrayList<>();
             for (TimeSlot slot : timeSlots) {
                 if (!slot.isBreak()) validSlots.add(slot);
@@ -143,6 +123,7 @@ public class GeneticAlgorithm {
         int totalConstraints = 0;
         Map<String, Set<String>> teacherSchedule = new HashMap<>();
         Map<String, Set<String>> batchSchedule = new HashMap<>();
+        Map<String, Integer> subjectClassCount = new HashMap<>();
 
         for (TimetableClass cls : individual.getClasses()) {
             TimeSlot ts = cls.getTimeSlot();
@@ -150,43 +131,38 @@ public class GeneticAlgorithm {
             String batchKey = cls.getBatch() + "_" + cls.getSection();
             String timeKey = ts.getDay() + "_" + ts.getPeriod();
 
-            // Don't schedule in breaks
-            if (ts.isBreak()) {
-                conflicts++;
-                totalConstraints++;
-                continue;
-            }
+            // Teacher and batch conflict check
+            if (!teacherSchedule.computeIfAbsent(teacherKey, k -> new HashSet<>()).add(timeKey)) conflicts++;
+            if (!batchSchedule.computeIfAbsent(batchKey, k -> new HashSet<>()).add(timeKey)) conflicts++;
 
-            // Teacher conflict check
-            if (!teacherSchedule.computeIfAbsent(teacherKey, k -> new HashSet<>()).add(timeKey)) {
-                conflicts++;
-            }
-
-            // Batch conflict check
-            if (!batchSchedule.computeIfAbsent(batchKey, k -> new HashSet<>()).add(timeKey)) {
-                conflicts++;
-            }
+            // Count scheduled classes per subject per batch
+            String subjBatchKey = cls.getSubject() + "_" + cls.getBatch() + "_" + (cls.isLab() ? "lab" : "lec");
+            subjectClassCount.put(subjBatchKey, subjectClassCount.getOrDefault(subjBatchKey, 0) + 1);
 
             totalConstraints += 2;
 
-            // For labs, ensure continuity and not across breaks
+            // Labs: Ensure double period and not across breaks
             if (cls.isLab() && cls.getDuration() == 2) {
-                if (ts.getPeriod() >= periodsPerDay) {
-                    conflicts++;
-                }
+                if (ts.getPeriod() >= periodsPerDay) conflicts++;
                 String nextKey = ts.getDay() + "_" + (ts.getPeriod() + 1);
-                if (breakSlotSet.contains(nextKey)) {
-                    conflicts++;
-                }
-                // Also, ensure no other class for same teacher/batch in next period
-                if (!teacherSchedule.get(teacherKey).add(nextKey)) {
-                    conflicts++;
-                }
-                if (!batchSchedule.get(batchKey).add(nextKey)) {
-                    conflicts++;
-                }
+                if (breakSlotSet.contains(nextKey)) conflicts++;
+                if (!teacherSchedule.get(teacherKey).add(nextKey)) conflicts++;
+                if (!batchSchedule.get(batchKey).add(nextKey)) conflicts++;
                 totalConstraints += 2;
             }
+        }
+
+        // Check for over/under scheduling of classes/labs per week
+        Set<String> checked = new HashSet<>();
+        for (TimetableClass cls : individual.getClasses()) {
+            String subjBatchKey = cls.getSubject() + "_" + cls.getBatch() + "_" + (cls.isLab() ? "lab" : "lec");
+            if (checked.contains(subjBatchKey)) continue;
+            checked.add(subjBatchKey);
+            int count = subjectClassCount.get(subjBatchKey);
+            int required = cls.isLab() ? cls.getWeeklyLabs() : cls.getWeeklyLectures();
+            if (count > required) conflicts += (count - required);
+            if (count < required) conflicts += (required - count);
+            totalConstraints++;
         }
 
         // Teacher load check
@@ -194,7 +170,6 @@ public class GeneticAlgorithm {
         for (TimetableClass cls : individual.getClasses()) {
             teacherLoadCount.merge(cls.getTeacher(), cls.getDuration(), Integer::sum);
         }
-
         for (Map.Entry<String, Integer> entry : teacherLoadCount.entrySet()) {
             int assigned = entry.getValue();
             int maxAllowed = teacherLoads.getOrDefault(entry.getKey(), 20);
@@ -216,18 +191,12 @@ public class GeneticAlgorithm {
 
     private Individual selectParentRoulette(List<Individual> population) {
         double totalFitness = 0;
-        for (Individual ind : population) {
-            totalFitness += ind.getFitness();
-        }
-
+        for (Individual ind : population) totalFitness += ind.getFitness();
         double randomPoint = Math.random() * totalFitness;
         double currentSum = 0;
-
         for (Individual ind : population) {
             currentSum += ind.getFitness();
-            if (currentSum >= randomPoint) {
-                return ind;
-            }
+            if (currentSum >= randomPoint) return ind;
         }
         return population.get(0);
     }
@@ -236,12 +205,9 @@ public class GeneticAlgorithm {
         Individual child = new Individual();
         List<TimetableClass> childClasses = new ArrayList<>();
         Random random = new Random();
-
-        // Two-point crossover
         int size = parent1.getClasses().size();
         int point1 = random.nextInt(size);
         int point2 = random.nextInt(size - point1) + point1;
-
         for (int i = 0; i < size; i++) {
             if (i >= point1 && i <= point2) {
                 childClasses.add(parent1.getClasses().get(i).clone());
@@ -249,14 +215,14 @@ public class GeneticAlgorithm {
                 childClasses.add(parent2.getClasses().get(i).clone());
             }
         }
-
         child.setClasses(childClasses);
         return child;
     }
 
-    private void mutate(Individual individual) {
+    private void mutate(Individual individual, List<TimetableClass> originalClasses) {
         Random random = new Random();
-        for (TimetableClass cls : individual.getClasses()) {
+        for (int i = 0; i < individual.getClasses().size(); i++) {
+            TimetableClass cls = individual.getClasses().get(i);
             if (random.nextDouble() < MUTATION_RATE) {
                 // Time slot mutation
                 cls.setTimeSlot(getRandomValidSlot(cls, random));
@@ -268,6 +234,15 @@ public class GeneticAlgorithm {
                     }
                 }
             }
+            // Ensure no duplicate or extra classes: match original subject/batch/section/lab
+            TimetableClass orig = originalClasses.get(i);
+            cls.setSubject(orig.getSubject());
+            cls.setBatch(orig.getBatch());
+            cls.setSection(orig.getSection());
+            cls.setLab(orig.isLab());
+            cls.setDuration(orig.getDuration());
+            cls.setWeeklyLectures(orig.getWeeklyLectures());
+            cls.setWeeklyLabs(orig.getWeeklyLabs());
         }
     }
 
