@@ -6,6 +6,8 @@ import android.app.TimePickerDialog;
 import android.view.View;
 import android.widget.*;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.lifecycle.ViewModelProvider;
+import com.example.timetablescheduler.viewmodel.DaysPeriodsViewModel;
 import com.parse.*;
 import com.google.android.material.textfield.TextInputEditText;
 import java.util.ArrayList;
@@ -21,13 +23,17 @@ public class DaysPeriodsActivity extends AppCompatActivity {
 
     private List<View> periodRows = new ArrayList<>();
     private List<View> breakRows = new ArrayList<>();
+    private DaysPeriodsViewModel viewModel;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_days_periods);
 
+        viewModel = new ViewModelProvider(this).get(DaysPeriodsViewModel.class);
+
         initializeViews();
+        restoreViewModel();
         setupListeners();
     }
 
@@ -52,10 +58,23 @@ public class DaysPeriodsActivity extends AppCompatActivity {
     }
 
     private void setupListeners() {
-        btnGenerateRows.setOnClickListener(v -> generatePeriodRows());
-        btnGenerateBreakRows.setOnClickListener(v -> generateBreakRows());
-        btnSave.setOnClickListener(v -> saveTimetableConfig());
-        btnNext.setOnClickListener(v -> navigateToBatchActivity());
+        btnGenerateRows.setOnClickListener(v -> {
+            saveToViewModel();
+            generatePeriodRows();
+        });
+        btnGenerateBreakRows.setOnClickListener(v -> {
+            saveToViewModel();
+            generateBreakRows();
+        });
+        btnSave.setOnClickListener(v -> {
+            saveToViewModel();
+            saveTimetableConfig();
+        });
+        btnNext.setOnClickListener(v -> {
+            saveToViewModel();
+            saveTimetableConfig();
+            startActivity(new Intent(this, BatchActivity.class));
+        });
 
         etDaysPerWeek.setOnFocusChangeListener((v, hasFocus) -> {
             if (!hasFocus) {
@@ -64,17 +83,91 @@ public class DaysPeriodsActivity extends AppCompatActivity {
         });
     }
 
+    private void restoreViewModel() {
+        etPeriodsPerDay.setText(viewModel.periodsPerDay);
+        etNumBreaks.setText(viewModel.numBreaks);
+        etDaysPerWeek.setText(viewModel.daysPerWeek);
+
+        // Restore period rows
+        if (!viewModel.periodRows.isEmpty()) {
+            layoutPeriodsContainer.removeAllViews();
+            periodRows.clear();
+            for (int i = 0; i < viewModel.periodRows.size(); i++) {
+                View row = createPeriodRow(i + 1);
+                EditText etStart = (EditText) ((LinearLayout) row).getChildAt(1);
+                EditText etEnd = (EditText) ((LinearLayout) row).getChildAt(2);
+                etStart.setText(viewModel.periodRows.get(i)[0]);
+                etEnd.setText(viewModel.periodRows.get(i)[1]);
+                layoutPeriodsContainer.addView(row);
+                periodRows.add(row);
+            }
+        }
+
+        // Restore break rows
+        if (!viewModel.breakRows.isEmpty()) {
+            layoutBreaksContainer.removeAllViews();
+            breakRows.clear();
+            for (int i = 0; i < viewModel.breakRows.size(); i++) {
+                View row = createBreakRow(i + 1);
+                EditText etAfter = (EditText) ((LinearLayout) row).getChildAt(0);
+                EditText etStart = (EditText) ((LinearLayout) row).getChildAt(1);
+                EditText etEnd = (EditText) ((LinearLayout) row).getChildAt(2);
+                etAfter.setText(viewModel.breakRows.get(i)[0]);
+                etStart.setText(viewModel.breakRows.get(i)[1]);
+                etEnd.setText(viewModel.breakRows.get(i)[2]);
+                layoutBreaksContainer.addView(row);
+                breakRows.add(row);
+            }
+        }
+
+        // Restore day checkboxes
+        CheckBox[] checkboxes = {cbMonday, cbTuesday, cbWednesday, cbThursday, cbFriday, cbSaturday, cbSunday};
+        for (int i = 0; i < checkboxes.length; i++) {
+            checkboxes[i].setChecked(viewModel.dayChecks[i]);
+        }
+    }
+
+    private void saveToViewModel() {
+        viewModel.periodsPerDay = etPeriodsPerDay.getText().toString();
+        viewModel.numBreaks = etNumBreaks.getText().toString();
+        viewModel.daysPerWeek = etDaysPerWeek.getText().toString();
+
+        viewModel.periodRows.clear();
+        for (View row : periodRows) {
+            EditText etStart = (EditText) ((LinearLayout) row).getChildAt(1);
+            EditText etEnd = (EditText) ((LinearLayout) row).getChildAt(2);
+            viewModel.periodRows.add(new String[]{etStart.getText().toString(), etEnd.getText().toString()});
+        }
+
+        viewModel.breakRows.clear();
+        for (View row : breakRows) {
+            EditText etAfter = (EditText) ((LinearLayout) row).getChildAt(0);
+            EditText etStart = (EditText) ((LinearLayout) row).getChildAt(1);
+            EditText etEnd = (EditText) ((LinearLayout) row).getChildAt(2);
+            viewModel.breakRows.add(new String[]{etAfter.getText().toString(), etStart.getText().toString(), etEnd.getText().toString()});
+        }
+
+        CheckBox[] checkboxes = {cbMonday, cbTuesday, cbWednesday, cbThursday, cbFriday, cbSaturday, cbSunday};
+        for (int i = 0; i < checkboxes.length; i++) {
+            viewModel.dayChecks[i] = checkboxes[i].isChecked();
+        }
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+        saveToViewModel();
+    }
+
     private void generatePeriodRows() {
         String periodsText = etPeriodsPerDay.getText().toString().trim();
         if (periodsText.isEmpty()) {
             showToast("Please enter number of periods");
             return;
         }
-
         int periods = Integer.parseInt(periodsText);
         layoutPeriodsContainer.removeAllViews();
         periodRows.clear();
-
         for (int i = 1; i <= periods; i++) {
             View periodRow = createPeriodRow(i);
             layoutPeriodsContainer.addView(periodRow);
@@ -121,7 +214,6 @@ public class DaysPeriodsActivity extends AppCompatActivity {
         int breaks = Integer.parseInt(breaksText);
         layoutBreaksContainer.removeAllViews();
         breakRows.clear();
-
         for (int i = 1; i <= breaks; i++) {
             View breakRow = createBreakRow(i);
             layoutBreaksContainer.addView(breakRow);
@@ -160,7 +252,6 @@ public class DaysPeriodsActivity extends AppCompatActivity {
         return row;
     }
 
-    // 12-hour format time picker with AM/PM
     private void showTimePicker(EditText editText, boolean autoFillEndTime) {
         Calendar calendar = Calendar.getInstance();
         int hour = calendar.get(Calendar.HOUR_OF_DAY);
@@ -172,19 +263,17 @@ public class DaysPeriodsActivity extends AppCompatActivity {
                     editText.setText(time);
 
                     if (autoFillEndTime) {
-                        // Auto-fill end time (1 hour later)
                         LinearLayout parent = (LinearLayout) editText.getParent();
                         EditText etEndTime = (EditText) parent.getChildAt(2);
                         int endHour = (selectedHour + 1) % 24;
                         String endTime = formatTime12Hour(endHour, selectedMinute);
                         etEndTime.setText(endTime);
                     }
-                }, hour, minute, false); // false for 12-hour format with AM/PM
+                }, hour, minute, false);
 
         timePickerDialog.show();
     }
 
-    // Helper to format time in 12-hour format with AM/PM
     private String formatTime12Hour(int hourOfDay, int minute) {
         String amPm = (hourOfDay >= 12) ? "PM" : "AM";
         int hour = hourOfDay % 12;
@@ -288,11 +377,6 @@ public class DaysPeriodsActivity extends AppCompatActivity {
             return false;
         }
         return true;
-    }
-
-    private void navigateToBatchActivity() {
-        saveTimetableConfig();
-        startActivity(new Intent(this, com.example.timetablescheduler.BatchActivity.class));
     }
 
     private void showToast(String message) {

@@ -5,25 +5,38 @@
     android:fillViewport="true"
     android:background="@android:color/white">
 
-    <HorizontalScrollView
+    <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:fillViewport="true">
+        android:orientation="vertical"
+        android:padding="16dp">
 
         <LinearLayout
-            android:layout_width="wrap_content"
+            android:id="@+id/infoLayout"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
-            android:padding="16dp">
+            android:gravity="center"
+            android:paddingBottom="8dp"/>
 
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Your Timetable"
-                android:textSize="20sp"
-                android:textStyle="bold"
-                android:layout_gravity="center"
-                android:paddingBottom="16dp"/>
+        <Spinner
+            android:id="@+id/batchSpinner"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="8dp"/>
+
+        <Button
+            android:id="@+id/printButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Print/Download PDF"
+            android:layout_gravity="center"
+            android:layout_marginBottom="16dp"/>
+
+        <HorizontalScrollView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:fillViewport="true">
 
             <TableLayout
                 android:id="@+id/timetableTable"
@@ -31,6 +44,6 @@
                 android:layout_height="wrap_content"
                 android:stretchColumns="*"
                 android:background="@android:color/white"/>
-        </LinearLayout>
-    </HorizontalScrollView>
+        </HorizontalScrollView>
+    </LinearLayout>
 </ScrollView>

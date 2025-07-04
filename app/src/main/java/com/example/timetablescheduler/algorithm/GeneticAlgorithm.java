@@ -4,11 +4,11 @@ import com.example.timetablescheduler.models.*;
 import java.util.*;
 
 public class GeneticAlgorithm {
-    private static final int POPULATION_SIZE = 80;
+    private static final int POPULATION_SIZE = 120;
     private static final double CROSSOVER_RATE = 0.8;
     private static final double MUTATION_RATE = 0.10;
-    private static final int MAX_GENERATIONS = 200;
-    private static final double FITNESS_THRESHOLD = 0.98;
+    private static final int MAX_GENERATIONS = 300;
+    private static final double FITNESS_THRESHOLD = 0.995;
     private static final int ELITISM_COUNT = POPULATION_SIZE / 10;
 
     private final List<TimeSlot> timeSlots;
@@ -91,17 +91,18 @@ public class GeneticAlgorithm {
         return population;
     }
 
+    // Only assign labs to valid double-period slots (never last period, never across break)
     private TimeSlot getRandomValidSlot(TimetableClass cls, Random random) {
         if (cls.isLab() && cls.getDuration() == 2) {
             List<TimeSlot> validLabSlots = new ArrayList<>();
             for (TimeSlot slot : timeSlots) {
                 if (slot.isBreak()) continue;
-                if (slot.getPeriod() >= periodsPerDay) continue;
+                if (slot.getPeriod() >= periodsPerDay) continue; // Can't start at last period
                 String nextKey = slot.getDay() + "_" + (slot.getPeriod() + 1);
-                if (breakSlotSet.contains(nextKey)) continue;
+                if (breakSlotSet.contains(nextKey)) continue; // Next period is a break
                 validLabSlots.add(slot);
             }
-            if (validLabSlots.isEmpty()) return timeSlots.get(0);
+            if (validLabSlots.isEmpty()) return timeSlots.get(0); // Fallback
             return validLabSlots.get(random.nextInt(validLabSlots.size()));
         } else {
             List<TimeSlot> validSlots = new ArrayList<>();
@@ -148,7 +149,7 @@ public class GeneticAlgorithm {
                 if (breakSlotSet.contains(nextKey)) conflicts++;
                 if (!teacherSchedule.get(teacherKey).add(nextKey)) conflicts++;
                 if (!batchSchedule.get(batchKey).add(nextKey)) conflicts++;
-                totalConstraints += 2;
+                totalConstraints += 3;
             }
         }
 
@@ -224,7 +225,6 @@ public class GeneticAlgorithm {
         for (int i = 0; i < individual.getClasses().size(); i++) {
             TimetableClass cls = individual.getClasses().get(i);
             if (random.nextDouble() < MUTATION_RATE) {
-                // Time slot mutation
                 cls.setTimeSlot(getRandomValidSlot(cls, random));
                 // Teacher mutation
                 if (random.nextDouble() < 0.3) {

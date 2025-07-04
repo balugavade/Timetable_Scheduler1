@@ -20,7 +20,7 @@ public class GeneticService extends IntentService {
         try {
             ParseUser user = ParseUser.getCurrentUser();
 
-            // 1. Fetch TimetableConfig
+            // Fetch config
             ParseQuery<ParseObject> configQuery = ParseQuery.getQuery("TimetableConfig");
             configQuery.whereEqualTo("user", user);
             configQuery.orderByDescending("createdAt");
@@ -36,7 +36,7 @@ public class GeneticService extends IntentService {
             List<ParseObject> breakObjs = config.getList("breaks");
             int periodsPerDay = periodObjs.size();
 
-            // Build TimeSlot list (skip breaks for class assignment)
+            // Build TimeSlot list
             List<TimeSlot> timeSlots = new ArrayList<>();
             for (int dayIdx = 0; dayIdx < workingDays.size(); dayIdx++) {
                 for (int periodIdx = 0; periodIdx < periodsPerDay; periodIdx++) {
@@ -45,7 +45,7 @@ public class GeneticService extends IntentService {
                 }
             }
 
-            // For lab validation, build a set of break slots for quick lookup
+            // Build break slot set
             Set<String> breakSlotSet = new HashSet<>();
             if (breakObjs != null) {
                 for (int dayIdx = 0; dayIdx < workingDays.size(); dayIdx++) {
@@ -56,7 +56,7 @@ public class GeneticService extends IntentService {
                 }
             }
 
-            // 2. Fetch Teachers
+            // Fetch teachers
             ParseQuery<ParseObject> teacherQuery = ParseQuery.getQuery("Teacher");
             teacherQuery.whereEqualTo("user", user);
             List<ParseObject> teacherObjs = teacherQuery.find();
@@ -75,12 +75,12 @@ public class GeneticService extends IntentService {
                 teacherSubjects.put(name, subjects);
             }
 
-            // 3. Fetch Batches
+            // Fetch batches
             ParseQuery<ParseObject> batchQuery = ParseQuery.getQuery("Batch");
             batchQuery.whereEqualTo("user", user);
             List<ParseObject> batchObjs = batchQuery.find();
 
-            // 4. Fetch Subjects (INCLUDE TEACHER DATA!)
+            // Fetch subjects
             ParseQuery<ParseObject> subjectQuery = ParseQuery.getQuery("Subject");
             subjectQuery.whereEqualTo("user", user);
             subjectQuery.include("teacher");
@@ -90,47 +90,49 @@ public class GeneticService extends IntentService {
                 subjectMap.put(s.getString("name"), s);
             }
 
-            // 5. Build TimetableClass list to schedule
-            List<TimetableClass> classesToSchedule = new ArrayList<>();
+            // For each batch, generate and save the best timetable
             for (ParseObject batch : batchObjs) {
                 String batchName = batch.getString("name");
+                String section = batch.has("section") ? batch.getString("section") : "";
+                String academicYear = batch.has("academicYear") ? batch.getString("academicYear") : "";
                 List<String> subjects = batch.getList("subjects");
                 if (subjects == null) continue;
+
+                List<TimetableClass> classesToSchedule = new ArrayList<>();
                 for (String subjectName : subjects) {
                     ParseObject subjObj = subjectMap.get(subjectName);
                     if (subjObj == null) continue;
-                    boolean isLab = subjObj.has("isLab") && subjObj.getBoolean("isLab");
                     int lecturesWeekly = subjObj.has("lecturesWeekly") ? subjObj.getInt("lecturesWeekly") : 0;
-                    int labsWeekly = subjObj.has("labsWeekly") ? subjObj.getInt("labsWeekly") : 0;
+                    boolean isLab = subjObj.has("isLab") && subjObj.getBoolean("isLab");
                     String teacherName = "";
                     ParseObject teacherObj = subjObj.getParseObject("teacher");
                     if (teacherObj != null) teacherName = teacherObj.getString("name");
                     // Lectures
                     for (int l = 0; l < lecturesWeekly; l++) {
                         classesToSchedule.add(new TimetableClass(
-                                subjectName, teacherName, batchName, "", null, false, 1, lecturesWeekly, labsWeekly
+                                subjectName, teacherName, batchName, section, null, false, 1, lecturesWeekly, isLab ? 1 : 0
                         ));
                     }
-                    // Labs (each lab is 2 periods, so labsWeekly is number of double slots)
-                    for (int lab = 0; lab < labsWeekly; lab++) {
+                    // Labs: only if isLab is true, exactly one per week
+                    if (isLab) {
                         classesToSchedule.add(new TimetableClass(
-                                subjectName, teacherName, batchName, "", null, true, 2, lecturesWeekly, labsWeekly
+                                subjectName, teacherName, batchName, section, null, true, 2, lecturesWeekly, 1
                         ));
                     }
                 }
+
+                // Run the Genetic Algorithm for this batch
+                GeneticAlgorithm ga = new GeneticAlgorithm(
+                        timeSlots, teacherLoads, teacherSubjects, teachers, periodsPerDay, breakSlotSet
+                );
+                Individual solution = ga.generateTimetable(classesToSchedule);
+
+                // Save the result (pass workingDays for day name mapping)
+                Log.d(TAG, "Saving generated timetable for batch: " + batchName);
+                new ParseRepository().saveTimetableForBatch(solution, workingDays, batchName, section, academicYear);
             }
 
-            // 6. Run the Genetic Algorithm
-            GeneticAlgorithm ga = new GeneticAlgorithm(
-                    timeSlots, teacherLoads, teacherSubjects, teachers, periodsPerDay, breakSlotSet
-            );
-            Individual solution = ga.generateTimetable(classesToSchedule);
-
-            // 7. Save the result (pass workingDays for day name mapping)
-            Log.d(TAG, "Saving generated timetable and entries...");
-            new ParseRepository().saveTimetable(solution, workingDays);
-
-            // 8. Notify UI
+            // Notify UI
             sendBroadcast(new Intent("TIMETABLE_GENERATED"));
             Log.d(TAG, "Broadcast sent");
 

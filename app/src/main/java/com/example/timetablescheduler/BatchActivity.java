@@ -7,6 +7,8 @@ import android.view.View;
 import android.widget.*;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.cardview.widget.CardView;
+import androidx.lifecycle.ViewModelProvider;
+import com.example.timetablescheduler.viewmodel.BatchViewModel;
 import com.google.android.material.textfield.TextInputEditText;
 import com.parse.*;
 import java.util.*;
@@ -21,11 +23,14 @@ public class BatchActivity extends AppCompatActivity {
     private List<View> batchCardViews = new ArrayList<>();
     private List<String> allSubjects = new ArrayList<>();
     private List<String> allTeachers = new ArrayList<>();
+    private BatchViewModel viewModel;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_batch);
+
+        viewModel = new ViewModelProvider(this).get(BatchViewModel.class);
 
         etDepartment = findViewById(R.id.etDepartment);
         etTotalBatches = findViewById(R.id.etTotalBatches);
@@ -35,9 +40,18 @@ public class BatchActivity extends AppCompatActivity {
         layoutBatchesContainer = findViewById(R.id.layoutBatchesContainer);
         tvBatchesHeader = findViewById(R.id.tvBatchesHeader);
 
-        btnGenerateBatches.setOnClickListener(v -> generateBatchCards());
-        btnSave.setOnClickListener(v -> saveBatchData());
+        restoreViewModel();
+
+        btnGenerateBatches.setOnClickListener(v -> {
+            saveToViewModel();
+            generateBatchCards();
+        });
+        btnSave.setOnClickListener(v -> {
+            saveToViewModel();
+            saveBatchData();
+        });
         btnNext.setOnClickListener(v -> {
+            saveToViewModel();
             saveBatchData();
             if (validateBatchData()) {
                 Intent intent = new Intent(BatchActivity.this, TimetableGenerationActivity.class);
@@ -131,6 +145,101 @@ public class BatchActivity extends AppCompatActivity {
 
             container.addView(subjectRow);
         }
+    }
+
+    private void saveToViewModel() {
+        if (viewModel == null) return;
+        viewModel.department = etDepartment.getText().toString();
+        viewModel.totalBatches = etTotalBatches.getText().toString();
+        viewModel.batchDataList.clear();
+
+        for (View batchCard : batchCardViews) {
+            TextInputEditText etBatchName = batchCard.findViewById(R.id.etBatchName);
+            CheckBox cbSectionA = batchCard.findViewById(R.id.cbSectionA);
+            CheckBox cbSectionB = batchCard.findViewById(R.id.cbSectionB);
+            TextInputEditText etAcademicYear = batchCard.findViewById(R.id.etAcademicYear);
+            TextInputEditText etTotalSubjects = batchCard.findViewById(R.id.etTotalSubjects);
+            LinearLayout layoutSubjectContainer = batchCard.findViewById(R.id.layoutSubjectContainer);
+
+            BatchViewModel.BatchData batchData = new BatchViewModel.BatchData();
+            batchData.batchName = etBatchName.getText().toString();
+            batchData.sectionA = cbSectionA.isChecked();
+            batchData.sectionB = cbSectionB.isChecked();
+            batchData.academicYear = etAcademicYear.getText().toString();
+            batchData.totalSubjects = etTotalSubjects.getText().toString();
+
+            for (int i = 0; i < layoutSubjectContainer.getChildCount(); i++) {
+                View subjectRow = layoutSubjectContainer.getChildAt(i);
+                Spinner spinnerSubject = subjectRow.findViewById(R.id.spinnerSubject);
+                Spinner spinnerTeacher = subjectRow.findViewById(R.id.spinnerTeacher);
+
+                BatchViewModel.SubjectTeacher st = new BatchViewModel.SubjectTeacher();
+                st.subject = spinnerSubject.getSelectedItem().toString();
+                st.teacher = spinnerTeacher.getSelectedItem().toString();
+                batchData.subjectTeachers.add(st);
+            }
+            viewModel.batchDataList.add(batchData);
+        }
+    }
+
+    private void restoreViewModel() {
+        if (viewModel == null) return;
+        etDepartment.setText(viewModel.department);
+        etTotalBatches.setText(viewModel.totalBatches);
+
+        if (!viewModel.batchDataList.isEmpty()) {
+            layoutBatchesContainer.removeAllViews();
+            batchCardViews.clear();
+            for (int i = 0; i < viewModel.batchDataList.size(); i++) {
+                BatchViewModel.BatchData batchData = viewModel.batchDataList.get(i);
+                CardView batchCard = (CardView) LayoutInflater.from(this)
+                        .inflate(R.layout.batch_item, layoutBatchesContainer, false);
+
+                TextInputEditText etBatchName = batchCard.findViewById(R.id.etBatchName);
+                CheckBox cbSectionA = batchCard.findViewById(R.id.cbSectionA);
+                CheckBox cbSectionB = batchCard.findViewById(R.id.cbSectionB);
+                TextInputEditText etAcademicYear = batchCard.findViewById(R.id.etAcademicYear);
+                TextInputEditText etTotalSubjects = batchCard.findViewById(R.id.etTotalSubjects);
+                LinearLayout layoutSubjectContainer = batchCard.findViewById(R.id.layoutSubjectContainer);
+
+                etBatchName.setText(batchData.batchName);
+                cbSectionA.setChecked(batchData.sectionA);
+                cbSectionB.setChecked(batchData.sectionB);
+                etAcademicYear.setText(batchData.academicYear);
+                etTotalSubjects.setText(batchData.totalSubjects);
+
+                for (BatchViewModel.SubjectTeacher st : batchData.subjectTeachers) {
+                    View subjectRow = LayoutInflater.from(this).inflate(R.layout.subject_row_item, layoutSubjectContainer, false);
+                    Spinner spinnerSubject = subjectRow.findViewById(R.id.spinnerSubject);
+                    Spinner spinnerTeacher = subjectRow.findViewById(R.id.spinnerTeacher);
+
+                    ArrayAdapter<String> subjectAdapter = new ArrayAdapter<>(
+                            this, android.R.layout.simple_spinner_item, allSubjects);
+                    subjectAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+                    spinnerSubject.setAdapter(subjectAdapter);
+                    int subjPos = allSubjects.indexOf(st.subject);
+                    if (subjPos >= 0) spinnerSubject.setSelection(subjPos);
+
+                    ArrayAdapter<String> teacherAdapter = new ArrayAdapter<>(
+                            this, android.R.layout.simple_spinner_item, allTeachers);
+                    teacherAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+                    spinnerTeacher.setAdapter(teacherAdapter);
+                    int teachPos = allTeachers.indexOf(st.teacher);
+                    if (teachPos >= 0) spinnerTeacher.setSelection(teachPos);
+
+                    layoutSubjectContainer.addView(subjectRow);
+                }
+
+                layoutBatchesContainer.addView(batchCard);
+                batchCardViews.add(batchCard);
+            }
+        }
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+        saveToViewModel();
     }
 
     private void saveBatchData() {
