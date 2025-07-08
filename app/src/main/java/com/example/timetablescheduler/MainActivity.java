@@ -30,7 +30,11 @@ public class MainActivity extends AppCompatActivity {
 
         // Auto-login if user exists
         if (ParseUser.getCurrentUser() != null) {
-            navigateToWelcome();
+            if (isAdmin(ParseUser.getCurrentUser().getUsername())) {
+                navigateToAdmin();
+            } else {
+                navigateToWelcome();
+            }
         }
     }
 
@@ -52,15 +56,28 @@ public class MainActivity extends AppCompatActivity {
         // Login with email by querying users
         ParseUser.logInInBackground(email, password, (user, e) -> {
             if (user != null) {
-                navigateToWelcome();
+                if (isAdmin(email)) {
+                    navigateToAdmin();
+                } else {
+                    navigateToWelcome();
+                }
             } else {
                 showToast("Login failed: " + (e != null ? e.getMessage() : "Invalid credentials"));
             }
         });
     }
 
+    private boolean isAdmin(String email) {
+        return "admin_mca@rvce.edu.in".equalsIgnoreCase(email);
+    }
+
     private void navigateToWelcome() {
         startActivity(new Intent(this, WelcomeActivity.class));
+        finish();
+    }
+
+    private void navigateToAdmin() {
+        startActivity(new Intent(this, AdminApproveTimetableActivity.class));
         finish();
     }
 
