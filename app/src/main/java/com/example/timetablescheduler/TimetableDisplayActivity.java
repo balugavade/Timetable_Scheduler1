@@ -1,6 +1,7 @@
 package com.example.timetablescheduler;
 
 import android.content.Context;
+import android.content.Intent;
 import android.print.PrintManager;
 import android.os.Bundle;
 import android.util.Log;
@@ -18,10 +19,11 @@ public class TimetableDisplayActivity extends AppCompatActivity {
     private LinearLayout infoLayout;
     private Spinner batchSpinner;
     private Button printButton;
+    private Button exitButton;
     private String selectedBatch, selectedSection, selectedAcademicYear;
     private static final String TAG = "TimetableDisplay";
 
-    // Cell size constants
+    private List<ParseObject> timetableBatches = new ArrayList<>();
     private static final int CELL_HEIGHT = 120;
     private static final int CELL_WIDTH = 180;
 
@@ -29,47 +31,77 @@ public class TimetableDisplayActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_timetable_display);
+
         tableLayout = findViewById(R.id.timetableTable);
         infoLayout = findViewById(R.id.infoLayout);
         batchSpinner = findViewById(R.id.batchSpinner);
         printButton = findViewById(R.id.printButton);
+        exitButton = findViewById(R.id.exitButton);
 
-        loadBatchList();
         printButton.setOnClickListener(v -> printTimetable());
+        exitButton.setOnClickListener(v -> {
+            Intent intent = new Intent(TimetableDisplayActivity.this, WelcomeActivity.class);
+            startActivity(intent);
+            finish();
+        });
+
+        loadBatchListWithTimetables();
     }
 
-    private void loadBatchList() {
-        ParseQuery<ParseObject> batchQuery = ParseQuery.getQuery("Batch");
-        batchQuery.whereEqualTo("user", ParseUser.getCurrentUser());
-        batchQuery.findInBackground((batches, e) -> {
-            if (e == null && batches != null) {
-                List<String> batchNames = new ArrayList<>();
-                for (ParseObject batch : batches) {
-                    String name = batch.getString("name");
-                    String section = batch.has("section") ? batch.getString("section") : "";
-                    String year = batch.has("academicYear") ? batch.getString("academicYear") : "";
-                    batchNames.add(name + (section.isEmpty() ? "" : " - " + section) + (year.isEmpty() ? "" : " (" + year + ")"));
+    private void loadBatchListWithTimetables() {
+        ParseQuery<ParseObject> timetableQuery = ParseQuery.getQuery("GeneratedTimetable");
+        timetableQuery.whereEqualTo("user", ParseUser.getCurrentUser());
+        timetableQuery.orderByDescending("createdAt");
+        timetableQuery.findInBackground((timetables, e) -> {
+            if (e != null || timetables == null || timetables.isEmpty()) {
+                timetableBatches.clear();
+                batchSpinner.setAdapter(null);
+                clearTimetableUI();
+                Toast.makeText(this, "No generated timetables found.", Toast.LENGTH_SHORT).show();
+                return;
+            }
+
+            List<String> batchNames = new ArrayList<>();
+            timetableBatches.clear();
+
+            for (ParseObject timetable : timetables) {
+                String batchName = timetable.getString("batch");
+                String section = timetable.has("section") ? timetable.getString("section") : "";
+                String year = timetable.has("academicYear") ? timetable.getString("academicYear") : "";
+                String displayName = batchName;
+                if (!section.isEmpty()) displayName += " - " + section;
+                if (!year.isEmpty()) displayName += " (" + year + ")";
+                batchNames.add(displayName);
+                timetableBatches.add(timetable);
+            }
+
+            ArrayAdapter<String> adapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item, batchNames);
+            adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+            batchSpinner.setAdapter(adapter);
+
+            batchSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+                @Override
+                public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                    ParseObject timetable = timetableBatches.get(position);
+                    selectedBatch = timetable.getString("batch");
+                    selectedSection = timetable.has("section") ? timetable.getString("section") : "";
+                    selectedAcademicYear = timetable.has("academicYear") ? timetable.getString("academicYear") : "";
+                    fetchAndShowTimetable(timetable);
                 }
-                ArrayAdapter<String> adapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item, batchNames);
-                adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
-                batchSpinner.setAdapter(adapter);
-                batchSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
-                    @Override
-                    public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
-                        ParseObject batch = batches.get(position);
-                        selectedBatch = batch.getString("name");
-                        selectedSection = batch.has("section") ? batch.getString("section") : "";
-                        selectedAcademicYear = batch.has("academicYear") ? batch.getString("academicYear") : "";
-                        fetchAndShowTimetable();
-                    }
-                    @Override
-                    public void onNothingSelected(AdapterView<?> parent) {}
-                });
+                @Override
+                public void onNothingSelected(AdapterView<?> parent) {
+                    clearTimetableUI();
+                }
+            });
+
+            // Select first batch by default
+            if (!timetableBatches.isEmpty()) {
+                batchSpinner.setSelection(0);
             }
         });
     }
 
-    private void fetchAndShowTimetable() {
+    private void fetchAndShowTimetable(ParseObject timetable) {
         ParseQuery<ParseObject> configQuery = ParseQuery.getQuery("TimetableConfig");
         configQuery.whereEqualTo("user", ParseUser.getCurrentUser());
         configQuery.orderByDescending("createdAt");
@@ -79,7 +111,7 @@ public class TimetableDisplayActivity extends AppCompatActivity {
 
         configQuery.getFirstInBackground((config, configErr) -> {
             if (config == null || configErr != null) {
-                Log.e(TAG, "No config found or error: " + (configErr != null ? configErr.getMessage() : "null"));
+                clearTimetableUI();
                 return;
             }
             List<String> workingDays = config.getList("workingDays");
@@ -88,45 +120,39 @@ public class TimetableDisplayActivity extends AppCompatActivity {
             int numDays = workingDays.size();
             int numPeriods = periods.size() + (breaks != null ? breaks.size() : 0);
 
-            ParseQuery<ParseObject> timetableQuery = ParseQuery.getQuery("GeneratedTimetable");
-            timetableQuery.whereEqualTo("user", ParseUser.getCurrentUser());
-            timetableQuery.whereEqualTo("batch", selectedBatch);
-            if (!selectedSection.isEmpty()) timetableQuery.whereEqualTo("section", selectedSection);
-            if (!selectedAcademicYear.isEmpty()) timetableQuery.whereEqualTo("academicYear", selectedAcademicYear);
-            timetableQuery.orderByDescending("generatedAt");
-            timetableQuery.setLimit(1);
-
-            timetableQuery.getFirstInBackground((timetable, e) -> {
-                if (timetable != null) {
-                    ParseQuery<ParseObject> entryQuery = ParseQuery.getQuery("TimetableEntry");
-                    entryQuery.whereEqualTo("timetable", timetable);
-                    entryQuery.findInBackground((entries, err) -> {
-                        // Build a map: [day][periodCol] -> [subject, teacher, isLab]
-                        String[][][] timetableData = new String[numDays][numPeriods][3];
-                        for (ParseObject entry : entries) {
-                            String dayStr = entry.getString("day");
-                            int dayIdx = workingDays.indexOf(dayStr);
-                            int periodIdx = entry.getInt("period") - 1;
-                            int colIdx = getPeriodColIndex(periodIdx, breaks);
-                            String subject = entry.getString("subject");
-                            String teacher = entry.getString("teacher");
-                            boolean isLab = entry.has("isLab") && entry.getBoolean("isLab");
-                            if (dayIdx >= 0 && dayIdx < numDays && colIdx >= 0 && colIdx < numPeriods) {
-                                timetableData[dayIdx][colIdx][0] = subject;
-                                timetableData[dayIdx][colIdx][1] = teacher;
-                                timetableData[dayIdx][colIdx][2] = String.valueOf(isLab);
-                            }
-                        }
-                        runOnUiThread(() -> renderTimetable(tableLayout, workingDays, periods, breaks, timetableData));
-                    });
-                } else {
-                    Log.w(TAG, "No GeneratedTimetable found for batch.");
+            ParseQuery<ParseObject> entryQuery = ParseQuery.getQuery("TimetableEntry");
+            entryQuery.whereEqualTo("timetable", timetable);
+            entryQuery.findInBackground((entries, err) -> {
+                if (err != null || entries == null || entries.isEmpty()) {
+                    clearTimetableUI();
+                    Toast.makeText(this, "No timetable entries found.", Toast.LENGTH_SHORT).show();
+                    return;
                 }
+                String[][][] timetableData = new String[numDays][numPeriods][3];
+                for (ParseObject entry : entries) {
+                    String dayStr = entry.getString("day");
+                    int dayIdx = workingDays.indexOf(dayStr);
+                    int periodIdx = entry.getInt("period") - 1;
+                    int colIdx = getPeriodColIndex(periodIdx, breaks);
+                    String subject = entry.getString("subject");
+                    String teacher = entry.getString("teacher");
+                    boolean isLab = entry.has("isLab") && entry.getBoolean("isLab");
+                    if (dayIdx >= 0 && dayIdx < numDays && colIdx >= 0 && colIdx < numPeriods) {
+                        timetableData[dayIdx][colIdx][0] = subject;
+                        timetableData[dayIdx][colIdx][1] = teacher;
+                        timetableData[dayIdx][colIdx][2] = String.valueOf(isLab);
+                    }
+                }
+                runOnUiThread(() -> renderTimetable(tableLayout, workingDays, periods, breaks, timetableData));
             });
         });
     }
 
-    // Map period index to column index, skipping breaks
+    private void clearTimetableUI() {
+        tableLayout.removeAllViews();
+        infoLayout.removeAllViews();
+    }
+
     private int getPeriodColIndex(int periodIdx, List<ParseObject> breaks) {
         int offset = 0;
         if (breaks != null) {
@@ -155,15 +181,14 @@ public class TimetableDisplayActivity extends AppCompatActivity {
             List<String> workingDays,
             List<ParseObject> periods,
             List<ParseObject> breaks,
-            String[][][] timetableData // [day][col][subject, teacher, isLab]
+            String[][][] timetableData
     ) {
         tableLayout.removeAllViews();
         infoLayout.removeAllViews();
 
-        // Show batch info above timetable
         String info = "Batch: " + selectedBatch;
-        if (!selectedSection.isEmpty()) info += " | Section: " + selectedSection;
-        if (!selectedAcademicYear.isEmpty()) info += " | Academic Year: " + selectedAcademicYear;
+        if (selectedSection != null && !selectedSection.isEmpty()) info += " | Section: " + selectedSection;
+        if (selectedAcademicYear != null && !selectedAcademicYear.isEmpty()) info += " | Academic Year: " + selectedAcademicYear;
         TextView infoText = new TextView(this);
         infoText.setText(info);
         infoText.setTextSize(20);
@@ -172,7 +197,7 @@ public class TimetableDisplayActivity extends AppCompatActivity {
 
         int numPeriods = periods.size() + (breaks != null ? breaks.size() : 0);
 
-        // 1. Header Row
+        // Header Row
         TableRow headerRow = new TableRow(this);
         headerRow.addView(createHeaderCell(""));
         int periodIdx = 0, breakIdx = 0;
@@ -190,7 +215,7 @@ public class TimetableDisplayActivity extends AppCompatActivity {
         }
         tableLayout.addView(headerRow);
 
-        // 2. Data Rows
+        // Data Rows
         for (int day = 0; day < workingDays.size(); day++) {
             TableRow row = new TableRow(this);
             row.addView(createDayCell(workingDays.get(day)));
@@ -294,7 +319,7 @@ public class TimetableDisplayActivity extends AppCompatActivity {
 
     private AppCompatTextView createEmptyCell() {
         AppCompatTextView tv = new AppCompatTextView(this);
-        tv.setText("—"); // Visually show empty slot
+        tv.setText("—");
         tv.setMinHeight(CELL_HEIGHT);
         tv.setMinWidth(CELL_WIDTH);
         tv.setGravity(Gravity.CENTER);
@@ -303,7 +328,6 @@ public class TimetableDisplayActivity extends AppCompatActivity {
         return tv;
     }
 
-    // Print/Download as PDF
     private void printTimetable() {
         PrintManager printManager = (PrintManager) getSystemService(Context.PRINT_SERVICE);
         printManager.print("Timetable_" + selectedBatch,

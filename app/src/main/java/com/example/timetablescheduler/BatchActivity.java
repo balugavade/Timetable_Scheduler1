@@ -16,7 +16,7 @@ import java.util.*;
 public class BatchActivity extends AppCompatActivity {
 
     private TextInputEditText etDepartment, etTotalBatches;
-    private Button btnGenerateBatches, btnSave, btnNext;
+    private Button btnGenerateBatches, btnNext, btnGenerateTimetable;
     private LinearLayout layoutBatchesContainer;
     private TextView tvBatchesHeader;
 
@@ -35,8 +35,8 @@ public class BatchActivity extends AppCompatActivity {
         etDepartment = findViewById(R.id.etDepartment);
         etTotalBatches = findViewById(R.id.etTotalBatches);
         btnGenerateBatches = findViewById(R.id.btnGenerateBatches);
-        btnSave = findViewById(R.id.btnSave);
         btnNext = findViewById(R.id.btnNext);
+        btnGenerateTimetable = findViewById(R.id.btnGenerateTimetable);
         layoutBatchesContainer = findViewById(R.id.layoutBatchesContainer);
         tvBatchesHeader = findViewById(R.id.tvBatchesHeader);
 
@@ -46,20 +46,27 @@ public class BatchActivity extends AppCompatActivity {
             saveToViewModel();
             generateBatchCards();
         });
-        btnSave.setOnClickListener(v -> {
-            saveToViewModel();
-            saveBatchData();
-        });
+
         btnNext.setOnClickListener(v -> {
             saveToViewModel();
-            saveBatchData();
-            if (validateBatchData()) {
-                Intent intent = new Intent(BatchActivity.this, TimetableGenerationActivity.class);
-                intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK | Intent.FLAG_ACTIVITY_NEW_TASK);
+            saveBatchData(() -> {
+                // No validation, always navigate
+                Intent intent = new Intent(BatchActivity.this, TimetableDisplayActivity.class);
                 startActivity(intent);
-            } else {
-                Toast.makeText(this, "Complete all batch configurations", Toast.LENGTH_SHORT).show();
-            }
+            });
+        });
+
+        btnGenerateTimetable.setOnClickListener(v -> {
+            saveToViewModel();
+            saveBatchData(() -> {
+                if (validateBatchData()) {
+                    Intent intent = new Intent(BatchActivity.this, TimetableGenerationActivity.class);
+                    intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK | Intent.FLAG_ACTIVITY_NEW_TASK);
+                    startActivity(intent);
+                } else {
+                    Toast.makeText(this, "Complete all batch configurations", Toast.LENGTH_SHORT).show();
+                }
+            });
         });
 
         fetchSubjectsAndTeachers();
@@ -242,9 +249,10 @@ public class BatchActivity extends AppCompatActivity {
         saveToViewModel();
     }
 
-    private void saveBatchData() {
+    // Accepts a Runnable callback for navigation after saving
+    private void saveBatchData(Runnable onSuccess) {
         if (batchCardViews.isEmpty()) {
-            Toast.makeText(this, "No batches to save", Toast.LENGTH_SHORT).show();
+            if (onSuccess != null) onSuccess.run();
             return;
         }
 
@@ -293,6 +301,7 @@ public class BatchActivity extends AppCompatActivity {
         ParseObject.saveAllInBackground(batchObjects, e -> {
             if (e == null) {
                 Toast.makeText(this, "Batches saved!", Toast.LENGTH_SHORT).show();
+                if (onSuccess != null) onSuccess.run();
             } else {
                 Toast.makeText(this, "Save error: " + e.getMessage(), Toast.LENGTH_SHORT).show();
             }

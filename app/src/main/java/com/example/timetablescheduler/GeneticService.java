@@ -1,3 +1,4 @@
+
 package com.example.timetablescheduler;
 
 import android.app.IntentService;
@@ -142,3 +143,4 @@ public class GeneticService extends IntentService {
         }
     }
 }
+

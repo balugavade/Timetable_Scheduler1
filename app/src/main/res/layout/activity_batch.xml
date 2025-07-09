@@ -85,11 +85,11 @@
             android:layout_marginTop="24dp">
 
             <Button
-                android:id="@+id/btnSave"
+                android:id="@+id/btnNext"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:text="Save"
+                android:text="Next"
                 android:backgroundTint="@color/purple_500"
                 android:textColor="@android:color/white" />
 
@@ -98,14 +98,13 @@
                 android:layout_height="wrap_content" />
 
             <Button
-                android:id="@+id/btnNext"
+                android:id="@+id/btnGenerateTimetable"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:text="Generate Timetable"
+                android:text="Generate TT"
                 android:backgroundTint="@color/teal_700"
                 android:textColor="@android:color/white" />
         </LinearLayout>
-
     </LinearLayout>
 </ScrollView>
