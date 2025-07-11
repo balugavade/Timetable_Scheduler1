@@ -43,10 +43,10 @@
             android:layout_height="wrap_content"
             android:layout_marginBottom="16dp"/>
 
-        <!-- Timetable inside horizontal scroll -->
         <HorizontalScrollView
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
+            android:layout_height="0dp"
+            android:layout_weight="1"
             android:fillViewport="true"
             android:scrollbars="horizontal">
 
@@ -60,7 +60,6 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:stretchColumns="*"
-                    android:shrinkColumns="*"
                     android:background="@android:color/white"
                     android:padding="8dp"/>
             </ScrollView>
@@ -76,6 +75,15 @@
             android:visibility="gone"
             android:layout_marginTop="32dp"
             android:textSize="16sp"/>
+
+        <Button
+            android:id="@+id/btnPrint"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Print"
+            android:layout_marginTop="16dp"
+            android:layout_marginBottom="8dp"
+            android:textSize="15sp"/>
     </LinearLayout>
 
     <Button

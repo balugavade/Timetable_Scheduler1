@@ -1,8 +1,10 @@
 package com.example.timetablescheduler;
 
+import android.content.Context;
 import android.content.Intent;
 import android.graphics.Typeface;
 import android.os.Bundle;
+import android.print.PrintManager;
 import android.view.Gravity;
 import android.view.View;
 import android.widget.*;
@@ -15,13 +17,17 @@ public class FacultyDashboardActivity extends AppCompatActivity {
 
     private TableLayout tableLayout;
     private TextView tvNoClasses;
-    private Button btnLogout;
-    private Spinner spinnerTeachers, spinnerTimetables;
+    private Button btnLogout, btnPrint;
+    private Spinner spinnerTeachers;
     private List<String> teacherNames = new ArrayList<>();
     private ArrayAdapter<String> spinnerAdapter;
-    private List<ParseObject> timetableList = new ArrayList<>();
-    private ArrayAdapter<String> timetableAdapter;
-    private String selectedTimetableId = null;
+    private List<ParseObject> approvedTimetables = new ArrayList<>();
+    private Set<String> approvedTimetableIds = new HashSet<>();
+
+    // Weekday order
+    private static final List<String> WEEK_ORDER = Arrays.asList(
+            "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"
+    );
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -31,8 +37,8 @@ public class FacultyDashboardActivity extends AppCompatActivity {
         tableLayout = findViewById(R.id.tableFacultyClasses);
         tvNoClasses = findViewById(R.id.tvNoClasses);
         btnLogout = findViewById(R.id.btnLogout);
+        btnPrint = findViewById(R.id.btnPrint);
         spinnerTeachers = findViewById(R.id.spinnerTeachers);
-        spinnerTimetables = findViewById(R.id.spinnerTimetables);
 
         setTitle("Faculty Dashboard");
 
@@ -44,54 +50,36 @@ public class FacultyDashboardActivity extends AppCompatActivity {
             finish();
         });
 
-        fetchTimetables();
+        btnPrint.setOnClickListener(v -> printTable());
+
+        fetchApprovedTimetablesAndTeachers();
     }
 
-    private void fetchTimetables() {
-        ParseQuery<ParseObject> query = ParseQuery.getQuery("GeneratedTimetable");
-        query.whereEqualTo("isApproved", true);
-        query.findInBackground((timetables, e) -> {
+    // Step 1: Fetch all approved timetables and build a set of their IDs
+    private void fetchApprovedTimetablesAndTeachers() {
+        ParseQuery<ParseObject> timetableQuery = ParseQuery.getQuery("GeneratedTimetable");
+        timetableQuery.whereEqualTo("isApproved", true);
+        timetableQuery.findInBackground((timetables, e) -> {
             if (e == null && timetables != null && !timetables.isEmpty()) {
-                timetableList.clear();
-                timetableList.addAll(timetables);
-                runOnUiThread(this::setupTimetableSpinner);
+                approvedTimetables.clear();
+                approvedTimetableIds.clear();
+                for (ParseObject t : timetables) {
+                    approvedTimetables.add(t);
+                    approvedTimetableIds.add(t.getObjectId());
+                }
+                fetchTeacherNamesFromApprovedTimetables();
             } else {
                 runOnUiThread(() -> Toast.makeText(this, "No approved timetables found", Toast.LENGTH_LONG).show());
             }
         });
     }
 
-    private void setupTimetableSpinner() {
-        List<String> timetableNames = new ArrayList<>();
-        for (ParseObject timetable : timetableList) {
-            String name = timetable.has("name") ? timetable.getString("name") : timetable.getObjectId();
-            timetableNames.add(name);
-        }
-        timetableAdapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item, timetableNames);
-        timetableAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
-        spinnerTimetables.setAdapter(timetableAdapter);
-
-        spinnerTimetables.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
-            @Override
-            public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
-                selectedTimetableId = timetableList.get(position).getObjectId();
-                fetchTeacherNames(selectedTimetableId);
-            }
-
-            @Override
-            public void onNothingSelected(AdapterView<?> parent) {
-                tableLayout.removeAllViews();
-                tvNoClasses.setVisibility(View.VISIBLE);
-            }
-        });
-    }
-
-    private void fetchTeacherNames(String timetableId) {
-        ParseObject selectedTimetable = ParseObject.createWithoutData("GeneratedTimetable", timetableId);
-        ParseQuery<ParseObject> query = ParseQuery.getQuery("TimetableEntry");
-        query.whereEqualTo("timetable", selectedTimetable);
-        query.selectKeys(Collections.singletonList("teacher"));
-        query.findInBackground((entries, e) -> {
+    // Step 2: Fetch all unique teacher names only from entries in approved timetables
+    private void fetchTeacherNamesFromApprovedTimetables() {
+        ParseQuery<ParseObject> entryQuery = ParseQuery.getQuery("TimetableEntry");
+        entryQuery.whereContainedIn("timetable", approvedTimetables);
+        entryQuery.selectKeys(Collections.singletonList("teacher"));
+        entryQuery.findInBackground((entries, e) -> {
             if (e == null && entries != null) {
                 Set<String> uniqueNames = new HashSet<>();
                 for (ParseObject entry : entries) {
@@ -119,7 +107,7 @@ public class FacultyDashboardActivity extends AppCompatActivity {
             @Override
             public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
                 String selectedTeacher = teacherNames.get(position);
-                loadFacultyClasses(selectedTeacher, selectedTimetableId);
+                loadFacultyClasses(selectedTeacher);
             }
 
             @Override
@@ -130,15 +118,18 @@ public class FacultyDashboardActivity extends AppCompatActivity {
         });
     }
 
-    private void loadFacultyClasses(String teacherName, String timetableId) {
-        ParseObject selectedTimetable = ParseObject.createWithoutData("GeneratedTimetable", timetableId);
+    // Step 3: Fetch all classes for the selected teacher, only from approved timetables
+    private void loadFacultyClasses(String teacherName) {
         ParseQuery<ParseObject> entryQuery = ParseQuery.getQuery("TimetableEntry");
-        entryQuery.whereEqualTo("timetable", selectedTimetable);
+        entryQuery.whereContainedIn("timetable", approvedTimetables);
         entryQuery.whereEqualTo("teacher", teacherName);
         entryQuery.findInBackground((entries, err) -> {
             if (err == null && entries != null && !entries.isEmpty()) {
+                List<MergedEntry> merged = mergeLabPeriods(entries);
+                // Sort by week order
+                merged.sort(Comparator.comparingInt(e -> WEEK_ORDER.indexOf(e.day)));
                 runOnUiThread(() -> {
-                    showTable(entries);
+                    showTable(merged);
                     tvNoClasses.setVisibility(View.GONE);
                 });
             } else {
@@ -147,25 +138,92 @@ public class FacultyDashboardActivity extends AppCompatActivity {
         });
     }
 
-    private void showTable(List<ParseObject> entries) {
+    // Helper class for merged rows
+    static class MergedEntry {
+        String day;
+        int startPeriod;
+        int endPeriod;
+        String subject;
+        String batch;
+        String section;
+
+        MergedEntry(String day, int startPeriod, int endPeriod, String subject, String batch, String section) {
+            this.day = day;
+            this.startPeriod = startPeriod;
+            this.endPeriod = endPeriod;
+            this.subject = subject;
+            this.batch = batch;
+            this.section = section;
+        }
+    }
+
+    // Merge consecutive lab periods for the same subject, batch, section, and day
+    private List<MergedEntry> mergeLabPeriods(List<ParseObject> entries) {
+        // Sort entries by day (week order), period
+        entries.sort(Comparator
+                .comparing((ParseObject e) -> {
+                    String d = e.getString("day");
+                    int idx = WEEK_ORDER.indexOf(d);
+                    return idx == -1 ? 100 : idx;
+                })
+                .thenComparingInt(e -> e.getInt("period")));
+
+        List<MergedEntry> mergedList = new ArrayList<>();
+        for (int i = 0; i < entries.size(); ) {
+            ParseObject entry = entries.get(i);
+            String day = entry.getString("day");
+            String subject = entry.getString("subject");
+            String batch = entry.getString("batch");
+            String section = entry.getString("section");
+            int period = entry.getInt("period");
+            boolean isLab = entry.has("isLab") && entry.getBoolean("isLab");
+
+            int endPeriod = period;
+            // Merge consecutive lab periods
+            while (isLab && i + 1 < entries.size()) {
+                ParseObject next = entries.get(i + 1);
+                if (next.getString("day").equals(day)
+                        && next.getString("subject").equals(subject)
+                        && next.getString("batch").equals(batch)
+                        && next.getString("section").equals(section)
+                        && next.getInt("period") == endPeriod + 1
+                        && next.has("isLab") && next.getBoolean("isLab")) {
+                    endPeriod++;
+                    i++;
+                } else {
+                    break;
+                }
+            }
+            mergedList.add(new MergedEntry(day, period, endPeriod, subject, batch, section));
+            i++;
+        }
+        return mergedList;
+    }
+
+    // Show merged, sorted table
+    private void showTable(List<MergedEntry> mergedEntries) {
         tableLayout.removeAllViews();
 
         TableRow header = new TableRow(this);
         addCell(header, "Day", true);
         addCell(header, "Timing", true);
         addCell(header, "Subject", true);
-        addCell(header, "Class/Batch", true);
+        addCell(header, "Batch/Class", true);
         addCell(header, "Section", true);
         tableLayout.addView(header);
 
-        for (ParseObject entry : entries) {
+        for (MergedEntry me : mergedEntries) {
             TableRow row = new TableRow(this);
-            addCell(row, entry.getString("day"), false);
-            String period = entry.has("period") ? "Period " + entry.getInt("period") : "-";
-            addCell(row, period, false);
-            addCell(row, entry.getString("subject"), false);
-            addCell(row, entry.getString("batch"), false);
-            addCell(row, entry.getString("section"), false);
+            addCell(row, me.day, false);
+
+            String periodText = me.startPeriod == me.endPeriod
+                    ? "Period " + me.startPeriod
+                    : "Period " + me.startPeriod + " - Period " + me.endPeriod;
+            addCell(row, periodText, false);
+
+            addCell(row, me.subject, false);
+            addCell(row, me.batch, false);
+            addCell(row, me.section, false);
             tableLayout.addView(row);
         }
     }
@@ -173,14 +231,12 @@ public class FacultyDashboardActivity extends AppCompatActivity {
     private void addCell(TableRow row, String text, boolean isHeader) {
         TextView tv = new TextView(this);
         tv.setText(text != null ? text : "-");
-        tv.setTextSize(14);
+        tv.setTextSize(isHeader ? 18 : 16);
         tv.setTypeface(null, isHeader ? Typeface.BOLD : Typeface.NORMAL);
-        tv.setPadding(24, 16, 24, 16);
-        tv.setGravity(Gravity.START | Gravity.CENTER_VERTICAL);
+        tv.setTextColor(isHeader ? getResources().getColor(R.color.purple_700) : getResources().getColor(android.R.color.black));
+        tv.setPadding(32, 20, 32, 20);
+        tv.setGravity(Gravity.CENTER);
         tv.setBackgroundResource(R.drawable.table_cell_border);
-        tv.setMaxLines(3);
-        tv.setEllipsize(null);
-        tv.setSingleLine(false);
         tv.setLayoutParams(new TableRow.LayoutParams(
                 TableRow.LayoutParams.WRAP_CONTENT,
                 TableRow.LayoutParams.WRAP_CONTENT
@@ -191,5 +247,11 @@ public class FacultyDashboardActivity extends AppCompatActivity {
     private void showNoClasses() {
         tableLayout.removeAllViews();
         tvNoClasses.setVisibility(View.VISIBLE);
+    }
+
+    // PRINT FUNCTIONALITY
+    private void printTable() {
+        PrintManager printManager = (PrintManager) getSystemService(Context.PRINT_SERVICE);
+        printManager.print("Faculty_Timetable", new TimetablePrintDocumentAdapter(this, tableLayout, "Faculty Timetable", "", ""), null);
     }
 }
