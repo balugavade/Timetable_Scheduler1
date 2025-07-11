@@ -11,4 +11,6 @@
     <color name="header_background">#E0E0E0</color>
     <color name="day_background">#F5F5F5</color>
     <color name="break_background">#FFEB3B</color>
+    <color name="purple_700">#3700B3</color>
+
 </resources>

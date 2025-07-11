@@ -12,7 +12,7 @@
         android:id="@+id/tvSignupTitle"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="Create Account"
+        android:text="Create New Account"
         android:textSize="26sp"
         android:textStyle="bold"
         android:textColor="@color/purple_500"

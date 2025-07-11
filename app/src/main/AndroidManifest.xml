@@ -16,9 +16,11 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.TimetableScheduler">
         <activity
-            android:name=".AdminApproveTimetableActivity"
+            android:name=".FacultyDashboardActivity"
             android:exported="false" />
-        <!-- Activities -->
+        <activity
+            android:name=".AdminApproveTimetableActivity"
+            android:exported="false" /> <!-- Activities -->
         <activity
             android:name=".TimetableDisplayActivity"
             android:exported="false" />

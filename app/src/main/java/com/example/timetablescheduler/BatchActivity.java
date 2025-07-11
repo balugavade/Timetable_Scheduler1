@@ -47,26 +47,25 @@ public class BatchActivity extends AppCompatActivity {
             generateBatchCards();
         });
 
+        // "Next" button: Always show toast and always navigate
         btnNext.setOnClickListener(v -> {
-            saveToViewModel();
-            saveBatchData(() -> {
-                // No validation, always navigate
-                Intent intent = new Intent(BatchActivity.this, TimetableDisplayActivity.class);
-                startActivity(intent);
-            });
+            Toast.makeText(this, "Please enter Batch details", Toast.LENGTH_SHORT).show();
+            Intent intent = new Intent(BatchActivity.this, TimetableDisplayActivity.class);
+            startActivity(intent);
         });
 
+        // "Generate TT": Validate and save before proceeding
         btnGenerateTimetable.setOnClickListener(v -> {
             saveToViewModel();
-            saveBatchData(() -> {
-                if (validateBatchData()) {
+            if (validateBatchData()) {
+                saveBatchData(() -> {
                     Intent intent = new Intent(BatchActivity.this, TimetableGenerationActivity.class);
                     intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK | Intent.FLAG_ACTIVITY_NEW_TASK);
                     startActivity(intent);
-                } else {
-                    Toast.makeText(this, "Complete all batch configurations", Toast.LENGTH_SHORT).show();
-                }
-            });
+                });
+            } else {
+                Toast.makeText(this, "Complete all batch configurations", Toast.LENGTH_SHORT).show();
+            }
         });
 
         fetchSubjectsAndTeachers();
@@ -162,16 +161,23 @@ public class BatchActivity extends AppCompatActivity {
 
         for (View batchCard : batchCardViews) {
             TextInputEditText etBatchName = batchCard.findViewById(R.id.etBatchName);
-            CheckBox cbSectionA = batchCard.findViewById(R.id.cbSectionA);
-            CheckBox cbSectionB = batchCard.findViewById(R.id.cbSectionB);
+            RadioGroup rgSection = batchCard.findViewById(R.id.rgSection);
             TextInputEditText etAcademicYear = batchCard.findViewById(R.id.etAcademicYear);
             TextInputEditText etTotalSubjects = batchCard.findViewById(R.id.etTotalSubjects);
             LinearLayout layoutSubjectContainer = batchCard.findViewById(R.id.layoutSubjectContainer);
 
             BatchViewModel.BatchData batchData = new BatchViewModel.BatchData();
             batchData.batchName = etBatchName.getText().toString();
-            batchData.sectionA = cbSectionA.isChecked();
-            batchData.sectionB = cbSectionB.isChecked();
+
+            int checkedId = rgSection.getCheckedRadioButtonId();
+            if (checkedId == R.id.rbSectionA) {
+                batchData.section = "A";
+            } else if (checkedId == R.id.rbSectionB) {
+                batchData.section = "B";
+            } else {
+                batchData.section = "";
+            }
+
             batchData.academicYear = etAcademicYear.getText().toString();
             batchData.totalSubjects = etTotalSubjects.getText().toString();
 
@@ -203,15 +209,21 @@ public class BatchActivity extends AppCompatActivity {
                         .inflate(R.layout.batch_item, layoutBatchesContainer, false);
 
                 TextInputEditText etBatchName = batchCard.findViewById(R.id.etBatchName);
-                CheckBox cbSectionA = batchCard.findViewById(R.id.cbSectionA);
-                CheckBox cbSectionB = batchCard.findViewById(R.id.cbSectionB);
+                RadioGroup rgSection = batchCard.findViewById(R.id.rgSection);
                 TextInputEditText etAcademicYear = batchCard.findViewById(R.id.etAcademicYear);
                 TextInputEditText etTotalSubjects = batchCard.findViewById(R.id.etTotalSubjects);
                 LinearLayout layoutSubjectContainer = batchCard.findViewById(R.id.layoutSubjectContainer);
 
                 etBatchName.setText(batchData.batchName);
-                cbSectionA.setChecked(batchData.sectionA);
-                cbSectionB.setChecked(batchData.sectionB);
+
+                if ("A".equals(batchData.section)) {
+                    rgSection.check(R.id.rbSectionA);
+                } else if ("B".equals(batchData.section)) {
+                    rgSection.check(R.id.rbSectionB);
+                } else {
+                    rgSection.clearCheck();
+                }
+
                 etAcademicYear.setText(batchData.academicYear);
                 etTotalSubjects.setText(batchData.totalSubjects);
 
@@ -249,10 +261,10 @@ public class BatchActivity extends AppCompatActivity {
         saveToViewModel();
     }
 
-    // Accepts a Runnable callback for navigation after saving
+    // Only called for Generate TT (strict validation)
     private void saveBatchData(Runnable onSuccess) {
         if (batchCardViews.isEmpty()) {
-            if (onSuccess != null) onSuccess.run();
+            Toast.makeText(this, "Please generate and fill at least one batch.", Toast.LENGTH_SHORT).show();
             return;
         }
 
@@ -260,18 +272,23 @@ public class BatchActivity extends AppCompatActivity {
 
         for (View batchCard : batchCardViews) {
             TextInputEditText etBatchName = batchCard.findViewById(R.id.etBatchName);
-            CheckBox cbSectionA = batchCard.findViewById(R.id.cbSectionA);
-            CheckBox cbSectionB = batchCard.findViewById(R.id.cbSectionB);
+            RadioGroup rgSection = batchCard.findViewById(R.id.rgSection);
             TextInputEditText etAcademicYear = batchCard.findViewById(R.id.etAcademicYear);
             LinearLayout layoutSubjectContainer = batchCard.findViewById(R.id.layoutSubjectContainer);
 
             String batchName = etBatchName.getText().toString().trim();
-            boolean sectionA = cbSectionA.isChecked();
-            boolean sectionB = cbSectionB.isChecked();
             String academicYear = etAcademicYear.getText().toString().trim();
 
-            if (batchName.isEmpty() || academicYear.isEmpty()) {
-                Toast.makeText(this, "Batch name and year are required", Toast.LENGTH_SHORT).show();
+            int checkedId = rgSection.getCheckedRadioButtonId();
+            String section = "";
+            if (checkedId == R.id.rbSectionA) {
+                section = "A";
+            } else if (checkedId == R.id.rbSectionB) {
+                section = "B";
+            }
+
+            if (batchName.isEmpty() || academicYear.isEmpty() || section.isEmpty()) {
+                Toast.makeText(this, "Batch name, section, and year are required", Toast.LENGTH_SHORT).show();
                 return;
             }
 
@@ -290,10 +307,9 @@ public class BatchActivity extends AppCompatActivity {
             ParseObject batch = new ParseObject("Batch");
             batch.put("user", ParseUser.getCurrentUser());
             batch.put("name", batchName);
-            batch.put("department", etDepartment.getText().toString());
+            batch.put("section", section);
             batch.put("academicYear", academicYear);
-            batch.put("sectionA", sectionA);
-            batch.put("sectionB", sectionB);
+            batch.put("department", etDepartment.getText().toString());
             batch.put("subjects", subjects);
             batchObjects.add(batch);
         }

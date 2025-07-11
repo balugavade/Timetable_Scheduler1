@@ -6,7 +6,9 @@ import android.widget.Button;
 import android.widget.EditText;
 import android.widget.Toast;
 import androidx.appcompat.app.AppCompatActivity;
+import com.parse.ParseQuery;
 import com.parse.ParseUser;
+import com.parse.ParseObject;
 
 public class MainActivity extends AppCompatActivity {
 
@@ -30,10 +32,11 @@ public class MainActivity extends AppCompatActivity {
 
         // Auto-login if user exists
         if (ParseUser.getCurrentUser() != null) {
-            if (isAdmin(ParseUser.getCurrentUser().getUsername())) {
+            String currentEmail = ParseUser.getCurrentUser().getUsername();
+            if (isAdmin(currentEmail)) {
                 navigateToAdmin();
             } else {
-                navigateToWelcome();
+                checkIfFacultyAndNavigate(currentEmail);
             }
         }
     }
@@ -53,16 +56,33 @@ public class MainActivity extends AppCompatActivity {
             return;
         }
 
-        // Login with email by querying users
         ParseUser.logInInBackground(email, password, (user, e) -> {
             if (user != null) {
                 if (isAdmin(email)) {
                     navigateToAdmin();
                 } else {
-                    navigateToWelcome();
+                    checkIfFacultyAndNavigate(email);
                 }
             } else {
                 showToast("Login failed: " + (e != null ? e.getMessage() : "Invalid credentials"));
+            }
+        });
+    }
+
+    private void checkIfFacultyAndNavigate(String email) {
+        // Check if the email exists in Teacher table
+        ParseQuery<ParseObject> query = ParseQuery.getQuery("Teacher");
+        query.whereEqualTo("email", email);
+        query.getFirstInBackground((teacher, ex) -> {
+            if (teacher != null) {
+                // Open faculty dashboard
+                Intent intent = new Intent(MainActivity.this, FacultyDashboardActivity.class);
+                intent.putExtra("teacherEmail", email);
+                startActivity(intent);
+                finish();
+            } else {
+                // Open student/general dashboard
+                navigateToWelcome();
             }
         });
     }

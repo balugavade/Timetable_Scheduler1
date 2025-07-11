@@ -1,7 +1,6 @@
 package com.example.timetablescheduler;
 
 import android.os.Bundle;
-import android.text.TextUtils;
 import android.view.View;
 import android.widget.*;
 import androidx.appcompat.app.AppCompatActivity;
@@ -13,7 +12,7 @@ import java.util.List;
 public class TeachersActivity extends AppCompatActivity {
 
     private Spinner spinnerTeachers;
-    private TextInputEditText etTeacherName, etTeacherPosition, etTeacherLoad, etSubjects, etTeacherDepartment;
+    private TextInputEditText etTeacherName, etTeacherEmail, etTeacherPosition, etTeacherLoad, etSubjects, etTeacherDepartment;
     private Button btnDeleteTeacher;
     private List<ParseObject> teacherList = new ArrayList<>();
     private ParseObject selectedTeacher;
@@ -23,16 +22,15 @@ public class TeachersActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_teachers);
 
-        // Initialize views
         spinnerTeachers = findViewById(R.id.spinnerTeachers);
         etTeacherName = findViewById(R.id.etTeacherName);
+        etTeacherEmail = findViewById(R.id.etTeacherEmail); // Email field
         etTeacherPosition = findViewById(R.id.etTeacherPosition);
         etTeacherLoad = findViewById(R.id.etTeacherLoad);
         etSubjects = findViewById(R.id.etSubjects);
         etTeacherDepartment = findViewById(R.id.etTeacherDepartment);
         btnDeleteTeacher = findViewById(R.id.btnDeleteTeacher);
 
-        // Setup listeners
         setupSpinner();
         setupButtonListeners();
         fetchTeachers();
@@ -48,7 +46,6 @@ public class TeachersActivity extends AppCompatActivity {
                     btnDeleteTeacher.setVisibility(View.VISIBLE);
                 }
             }
-
             @Override
             public void onNothingSelected(AdapterView<?> parent) {
                 clearForm();
@@ -59,17 +56,17 @@ public class TeachersActivity extends AppCompatActivity {
 
     private void populateTeacherData(ParseObject teacher) {
         etTeacherName.setText(teacher.getString("name"));
+        etTeacherEmail.setText(teacher.getString("email"));
         etTeacherPosition.setText(teacher.getString("position"));
         etTeacherLoad.setText(teacher.getString("load"));
         etTeacherDepartment.setText(teacher.getString("department"));
-
-        // FIX: Retrieve as string instead of list
         String subjects = teacher.getString("subjects");
         etSubjects.setText(subjects != null ? subjects : "");
     }
 
     private void clearForm() {
         etTeacherName.setText("");
+        etTeacherEmail.setText("");
         etTeacherPosition.setText("");
         etTeacherLoad.setText("");
         etSubjects.setText("");
@@ -86,12 +83,13 @@ public class TeachersActivity extends AppCompatActivity {
 
     private void saveTeacher() {
         String name = etTeacherName.getText().toString().trim();
+        String email = etTeacherEmail.getText().toString().trim();
         String position = etTeacherPosition.getText().toString().trim();
         String load = etTeacherLoad.getText().toString().trim();
         String department = etTeacherDepartment.getText().toString().trim();
         String subjects = etSubjects.getText().toString().trim();
 
-        if (name.isEmpty() || position.isEmpty() || load.isEmpty()) {
+        if (name.isEmpty() || email.isEmpty() || position.isEmpty() || load.isEmpty()) {
             Toast.makeText(this, "Please fill required fields", Toast.LENGTH_SHORT).show();
             return;
         }
@@ -99,11 +97,10 @@ public class TeachersActivity extends AppCompatActivity {
         ParseObject teacher = (selectedTeacher != null) ? selectedTeacher : new ParseObject("Teacher");
         teacher.put("user", ParseUser.getCurrentUser());
         teacher.put("name", name);
+        teacher.put("email", email);
         teacher.put("position", position);
         teacher.put("load", load);
         teacher.put("department", department);
-
-        // FIX: Store subjects as a single comma-separated string
         teacher.put("subjects", subjects);
 
         teacher.saveInBackground(e -> {
@@ -147,7 +144,12 @@ public class TeachersActivity extends AppCompatActivity {
     private void updateTeacherSpinner() {
         List<String> teacherNames = new ArrayList<>();
         for (ParseObject teacher : teacherList) {
-            teacherNames.add(teacher.getString("name"));
+            String display = teacher.getString("name");
+            String email = teacher.getString("email");
+            if (email != null && !email.isEmpty()) {
+                display += " (" + email + ")";
+            }
+            teacherNames.add(display);
         }
 
         ArrayAdapter<String> adapter = new ArrayAdapter<>(

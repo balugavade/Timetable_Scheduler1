@@ -7,17 +7,17 @@ public class Batch {
     private String name;
     private String department;
     private String academicYear;
-    private List<String> sections;
+    private String section; // Changed from List<String> to String
     private List<String> subjects;
 
     // Constructors
     public Batch() {}
 
-    public Batch(String name, String department, String academicYear, List<String> sections, List<String> subjects) {
+    public Batch(String name, String department, String academicYear, String section, List<String> subjects) {
         this.name = name;
         this.department = department;
         this.academicYear = academicYear;
-        this.sections = sections;
+        this.section = section;
         this.subjects = subjects;
     }
 
@@ -34,8 +34,8 @@ public class Batch {
     public String getAcademicYear() { return academicYear; }
     public void setAcademicYear(String academicYear) { this.academicYear = academicYear; }
 
-    public List<String> getSections() { return sections; }
-    public void setSections(List<String> sections) { this.sections = sections; }
+    public String getSection() { return section; }
+    public void setSection(String section) { this.section = section; }
 
     public List<String> getSubjects() { return subjects; }
     public void setSubjects(List<String> subjects) { this.subjects = subjects; }

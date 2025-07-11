@@ -1,4 +1,3 @@
-
 package com.example.timetablescheduler;
 
 import android.app.IntentService;
@@ -57,25 +56,6 @@ public class GeneticService extends IntentService {
                 }
             }
 
-            // Fetch teachers
-            ParseQuery<ParseObject> teacherQuery = ParseQuery.getQuery("Teacher");
-            teacherQuery.whereEqualTo("user", user);
-            List<ParseObject> teacherObjs = teacherQuery.find();
-
-            Map<String, Integer> teacherLoads = new HashMap<>();
-            Map<String, List<String>> teacherSubjects = new HashMap<>();
-            List<String> teachers = new ArrayList<>();
-            for (ParseObject t : teacherObjs) {
-                String name = t.getString("name");
-                teachers.add(name);
-                int load = 20;
-                try { load = Integer.parseInt(t.getString("load")); } catch (Exception ignore) {}
-                teacherLoads.put(name, load);
-                String subjectsStr = t.getString("subjects");
-                List<String> subjects = Arrays.asList(subjectsStr.split(","));
-                teacherSubjects.put(name, subjects);
-            }
-
             // Fetch batches
             ParseQuery<ParseObject> batchQuery = ParseQuery.getQuery("Batch");
             batchQuery.whereEqualTo("user", user);
@@ -84,7 +64,6 @@ public class GeneticService extends IntentService {
             // Fetch subjects
             ParseQuery<ParseObject> subjectQuery = ParseQuery.getQuery("Subject");
             subjectQuery.whereEqualTo("user", user);
-            subjectQuery.include("teacher");
             List<ParseObject> subjectObjs = subjectQuery.find();
             Map<String, ParseObject> subjectMap = new HashMap<>();
             for (ParseObject s : subjectObjs) {
@@ -96,25 +75,26 @@ public class GeneticService extends IntentService {
                 String batchName = batch.getString("name");
                 String section = batch.has("section") ? batch.getString("section") : "";
                 String academicYear = batch.has("academicYear") ? batch.getString("academicYear") : "";
-                List<String> subjects = batch.getList("subjects");
-                if (subjects == null) continue;
+
+                List<Map<String, String>> subjectTeachers = batch.getList("subjectTeachers");
+                if (subjectTeachers == null) continue;
 
                 List<TimetableClass> classesToSchedule = new ArrayList<>();
-                for (String subjectName : subjects) {
+                for (Map<String, String> st : subjectTeachers) {
+                    String subjectName = st.get("subject");
+                    String teacherName = st.get("teacher");
                     ParseObject subjObj = subjectMap.get(subjectName);
                     if (subjObj == null) continue;
                     int lecturesWeekly = subjObj.has("lecturesWeekly") ? subjObj.getInt("lecturesWeekly") : 0;
                     boolean isLab = subjObj.has("isLab") && subjObj.getBoolean("isLab");
-                    String teacherName = "";
-                    ParseObject teacherObj = subjObj.getParseObject("teacher");
-                    if (teacherObj != null) teacherName = teacherObj.getString("name");
+
                     // Lectures
                     for (int l = 0; l < lecturesWeekly; l++) {
                         classesToSchedule.add(new TimetableClass(
                                 subjectName, teacherName, batchName, section, null, false, 1, lecturesWeekly, isLab ? 1 : 0
                         ));
                     }
-                    // Labs: only if isLab is true, exactly one per week
+                    // Labs
                     if (isLab) {
                         classesToSchedule.add(new TimetableClass(
                                 subjectName, teacherName, batchName, section, null, true, 2, lecturesWeekly, 1
@@ -124,12 +104,11 @@ public class GeneticService extends IntentService {
 
                 // Run the Genetic Algorithm for this batch
                 GeneticAlgorithm ga = new GeneticAlgorithm(
-                        timeSlots, teacherLoads, teacherSubjects, teachers, periodsPerDay, breakSlotSet
+                        timeSlots, new HashMap<>(), new HashMap<>(), new ArrayList<>(), periodsPerDay, breakSlotSet
                 );
                 Individual solution = ga.generateTimetable(classesToSchedule);
 
                 // Save the result (pass workingDays for day name mapping)
-                Log.d(TAG, "Saving generated timetable for batch: " + batchName);
                 new ParseRepository().saveTimetableForBatch(solution, workingDays, batchName, section, academicYear);
             }
 
@@ -143,4 +122,3 @@ public class GeneticService extends IntentService {
         }
     }
 }
-
