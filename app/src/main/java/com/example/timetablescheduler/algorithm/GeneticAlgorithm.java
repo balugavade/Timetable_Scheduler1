@@ -36,7 +36,7 @@ public class GeneticAlgorithm {
 
         while (generation < MAX_GENERATIONS) {
             evaluatePopulation(population);
-            Collections.sort(population, (i1, i2) -> Double.compare(i2.getFitness(), i1.getFitness()));
+            population.sort((i1, i2) -> Double.compare(i2.getFitness(), i1.getFitness()));
             Individual currentBest = population.get(0);
             if (bestSolution == null || currentBest.getFitness() > bestSolution.getFitness()) {
                 bestSolution = currentBest.clone();
@@ -256,4 +256,3 @@ public class GeneticAlgorithm {
         return eligible;
     }
 }
-
