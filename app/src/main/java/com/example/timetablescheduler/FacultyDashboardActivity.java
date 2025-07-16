@@ -5,6 +5,7 @@ import android.content.Intent;
 import android.graphics.Typeface;
 import android.os.Bundle;
 import android.print.PrintManager;
+import android.util.Log;
 import android.view.Gravity;
 import android.view.View;
 import android.widget.*;
@@ -18,12 +19,10 @@ public class FacultyDashboardActivity extends AppCompatActivity {
     private TableLayout tableLayout;
     private TextView tvNoClasses;
     private Button btnLogout, btnPrint;
-    private Spinner spinnerTeachers, spinnerTimetables;
+    private Spinner spinnerTeachers;
     private List<String> teacherNames = new ArrayList<>();
     private ArrayAdapter<String> spinnerAdapter;
     private List<ParseObject> timetableList = new ArrayList<>();
-    private ArrayAdapter<String> timetableAdapter;
-    private String selectedTimetableId = null;
     private String selectedTeacherName = "";
 
     private static final List<String> WEEK_ORDER = Arrays.asList(
@@ -43,7 +42,6 @@ public class FacultyDashboardActivity extends AppCompatActivity {
         btnLogout = findViewById(R.id.btnLogout);
         btnPrint = findViewById(R.id.btnPrint);
         spinnerTeachers = findViewById(R.id.spinnerTeachers);
-        spinnerTimetables = findViewById(R.id.spinnerTimetables);
 
         btnLogout.setOnClickListener(v -> {
             ParseUser.logOut();
@@ -55,72 +53,52 @@ public class FacultyDashboardActivity extends AppCompatActivity {
 
         btnPrint.setOnClickListener(v -> printTable());
 
-        fetchTimetables();
+        fetchTeacherNames();
     }
 
-    private void fetchTimetables() {
-        ParseQuery<ParseObject> query = ParseQuery.getQuery("GeneratedTimetable");
-        query.whereEqualTo("isApproved", true);
-        query.findInBackground((timetables, e) -> {
-            if (e == null && timetables != null && !timetables.isEmpty()) {
-                timetableList.clear();
-                timetableList.addAll(timetables);
-                runOnUiThread(this::setupTimetableSpinner);
-            } else {
+    // Step 1: Fetch all teacher names that appear in approved timetables
+    private void fetchTeacherNames() {
+        ParseQuery<ParseObject> timetableQuery = ParseQuery.getQuery("GeneratedTimetable");
+        timetableQuery.whereEqualTo("isApprovedByAdmin", true);
+        timetableQuery.whereEqualTo("isApprovedByDean", true);
+        timetableQuery.whereEqualTo("isApprovedByPrincipal", true);
+        timetableQuery.findInBackground((timetables, e) -> {
+            if (e != null || timetables == null || timetables.isEmpty()) {
                 runOnUiThread(() -> Toast.makeText(this, "No approved timetables found", Toast.LENGTH_LONG).show());
+                return;
             }
-        });
-    }
+            timetableList.clear();
+            timetableList.addAll(timetables);
 
-    private void setupTimetableSpinner() {
-        List<String> timetableNames = new ArrayList<>();
-        for (ParseObject timetable : timetableList) {
-            String name = timetable.has("name") ? timetable.getString("name") : timetable.getObjectId();
-            timetableNames.add(name);
-        }
-        timetableAdapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item, timetableNames);
-        timetableAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
-        spinnerTimetables.setAdapter(timetableAdapter);
-
-        spinnerTimetables.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
-            @Override
-            public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
-                selectedTimetableId = timetableList.get(position).getObjectId();
-                fetchTeacherNames(selectedTimetableId);
+            // Now fetch teacher names from all TimetableEntry objects whose timetable is in this list
+            List<ParseQuery<ParseObject>> subQueries = new ArrayList<>();
+            for (ParseObject timetable : timetables) {
+                ParseQuery<ParseObject> entryQuery = ParseQuery.getQuery("TimetableEntry");
+                entryQuery.whereEqualTo("timetable", timetable);
+                subQueries.add(entryQuery);
             }
-
-            @Override
-            public void onNothingSelected(AdapterView<?> parent) {
-                tableLayout.removeAllViews();
-                tvNoClasses.setVisibility(View.VISIBLE);
-            }
-        });
-    }
-
-    private void fetchTeacherNames(String timetableId) {
-        ParseObject selectedTimetable = ParseObject.createWithoutData("GeneratedTimetable", timetableId);
-        ParseQuery<ParseObject> query = ParseQuery.getQuery("TimetableEntry");
-        query.whereEqualTo("timetable", selectedTimetable);
-        query.selectKeys(Collections.singletonList("teacher"));
-        query.findInBackground((entries, e) -> {
-            if (e == null && entries != null) {
+            ParseQuery<ParseObject> mainQuery = ParseQuery.or(subQueries);
+            mainQuery.selectKeys(Collections.singletonList("teacher"));
+            mainQuery.findInBackground((entries, ee) -> {
+                if (ee != null) {
+                    runOnUiThread(() -> Toast.makeText(this, "Error fetching teachers", Toast.LENGTH_LONG).show());
+                    return;
+                }
                 Set<String> uniqueNames = new HashSet<>();
                 for (ParseObject entry : entries) {
-                    String name = entry.getString("teacher");
-                    if (name != null && !name.trim().isEmpty()) {
-                        uniqueNames.add(name);
-                    }
+                    String teacher = entry.getString("teacher");
+                    if (teacher != null && !teacher.trim().isEmpty())
+                        uniqueNames.add(teacher);
                 }
                 teacherNames.clear();
                 teacherNames.addAll(uniqueNames);
                 Collections.sort(teacherNames);
                 runOnUiThread(this::setupTeacherSpinner);
-            } else {
-                runOnUiThread(() -> Toast.makeText(this, "Failed to load teacher names", Toast.LENGTH_LONG).show());
-            }
+            });
         });
     }
 
+    // Step 2: Show spinner for teachers, on selection: show their classes from all approved timetables
     private void setupTeacherSpinner() {
         spinnerAdapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item, teacherNames);
         spinnerAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
@@ -130,7 +108,7 @@ public class FacultyDashboardActivity extends AppCompatActivity {
             @Override
             public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
                 selectedTeacherName = teacherNames.get(position);
-                loadFacultyClasses(selectedTeacherName, selectedTimetableId);
+                loadFacultyClasses(selectedTeacherName);
             }
 
             @Override
@@ -141,12 +119,22 @@ public class FacultyDashboardActivity extends AppCompatActivity {
         });
     }
 
-    private void loadFacultyClasses(String teacherName, String timetableId) {
-        ParseObject selectedTimetable = ParseObject.createWithoutData("GeneratedTimetable", timetableId);
-        ParseQuery<ParseObject> entryQuery = ParseQuery.getQuery("TimetableEntry");
-        entryQuery.whereEqualTo("timetable", selectedTimetable);
-        entryQuery.whereEqualTo("teacher", teacherName);
-        entryQuery.findInBackground((entries, err) -> {
+    // Step 3: Find timetable entries for selected teacher, but only from approved timetables
+    private void loadFacultyClasses(String teacherName) {
+        // Build a query for entries where timetable in approved list and teacher = selected
+        List<ParseQuery<ParseObject>> queries = new ArrayList<>();
+        for (ParseObject timetable : timetableList) {
+            ParseQuery<ParseObject> entryQuery = ParseQuery.getQuery("TimetableEntry");
+            entryQuery.whereEqualTo("timetable", timetable);
+            entryQuery.whereEqualTo("teacher", teacherName);
+            queries.add(entryQuery);
+        }
+        if (queries.isEmpty()) {
+            showNoClasses();
+            return;
+        }
+        ParseQuery<ParseObject> mainQuery = ParseQuery.or(queries);
+        mainQuery.findInBackground((entries, err) -> {
             if (err == null && entries != null && !entries.isEmpty()) {
                 List<MergedEntry> merged = mergeLabPeriods(entries);
                 // Sort by week order
@@ -161,7 +149,6 @@ public class FacultyDashboardActivity extends AppCompatActivity {
         });
     }
 
-    // Helper class for merged rows
     static class MergedEntry {
         String day;
         int startPeriod;
@@ -180,7 +167,6 @@ public class FacultyDashboardActivity extends AppCompatActivity {
         }
     }
 
-    // Merge consecutive lab periods for the same subject, batch, section, and day
     private List<MergedEntry> mergeLabPeriods(List<ParseObject> entries) {
         entries.sort(Comparator
                 .comparing((ParseObject e) -> {
@@ -224,7 +210,6 @@ public class FacultyDashboardActivity extends AppCompatActivity {
     private void showTable(List<MergedEntry> entries) {
         tableLayout.removeAllViews();
 
-        // Header row
         TableRow header = new TableRow(this);
         addCell(header, "Day", true);
         addCell(header, "Timing", true);
@@ -270,7 +255,6 @@ public class FacultyDashboardActivity extends AppCompatActivity {
         tvNoClasses.setVisibility(View.VISIBLE);
     }
 
-    // PRINT FUNCTIONALITY
     private void printTable() {
         PrintManager printManager = (PrintManager) getSystemService(Context.PRINT_SERVICE);
         printManager.print("Faculty_Timetable",

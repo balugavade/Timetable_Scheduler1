@@ -11,6 +11,7 @@ import androidx.lifecycle.ViewModelProvider;
 import com.example.timetablescheduler.viewmodel.BatchViewModel;
 import com.google.android.material.textfield.TextInputEditText;
 import com.parse.*;
+
 import java.util.*;
 
 public class BatchActivity extends AppCompatActivity {
@@ -41,20 +42,18 @@ public class BatchActivity extends AppCompatActivity {
         tvBatchesHeader = findViewById(R.id.tvBatchesHeader);
 
         restoreViewModel();
+        fetchSubjectsAndTeachers();
 
         btnGenerateBatches.setOnClickListener(v -> {
             saveToViewModel();
             generateBatchCards();
         });
 
-        // "Next" button: Always show toast and always navigate
         btnNext.setOnClickListener(v -> {
-            Toast.makeText(this, "Please enter Batch details", Toast.LENGTH_SHORT).show();
             Intent intent = new Intent(BatchActivity.this, TimetableDisplayActivity.class);
             startActivity(intent);
         });
 
-        // "Generate TT": Validate and save before proceeding
         btnGenerateTimetable.setOnClickListener(v -> {
             saveToViewModel();
             if (validateBatchData()) {
@@ -64,11 +63,9 @@ public class BatchActivity extends AppCompatActivity {
                     startActivity(intent);
                 });
             } else {
-                Toast.makeText(this, "Complete all batch configurations", Toast.LENGTH_SHORT).show();
+                Toast.makeText(this, "Please fill all batch and subject-teacher info", Toast.LENGTH_SHORT).show();
             }
         });
-
-        fetchSubjectsAndTeachers();
     }
 
     private void fetchSubjectsAndTeachers() {
@@ -138,14 +135,14 @@ public class BatchActivity extends AppCompatActivity {
             View subjectRow = inflater.inflate(R.layout.subject_row_item, container, false);
 
             Spinner spinnerSubject = subjectRow.findViewById(R.id.spinnerSubject);
-            ArrayAdapter<String> subjectAdapter = new ArrayAdapter<>(
-                    this, android.R.layout.simple_spinner_item, allSubjects);
+            ArrayAdapter<String> subjectAdapter = new ArrayAdapter<>(this,
+                    android.R.layout.simple_spinner_item, allSubjects);
             subjectAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
             spinnerSubject.setAdapter(subjectAdapter);
 
             Spinner spinnerTeacher = subjectRow.findViewById(R.id.spinnerTeacher);
-            ArrayAdapter<String> teacherAdapter = new ArrayAdapter<>(
-                    this, android.R.layout.simple_spinner_item, allTeachers);
+            ArrayAdapter<String> teacherAdapter = new ArrayAdapter<>(this,
+                    android.R.layout.simple_spinner_item, allTeachers);
             teacherAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
             spinnerTeacher.setAdapter(teacherAdapter);
 
@@ -195,73 +192,6 @@ public class BatchActivity extends AppCompatActivity {
         }
     }
 
-    private void restoreViewModel() {
-        if (viewModel == null) return;
-        etDepartment.setText(viewModel.department);
-        etTotalBatches.setText(viewModel.totalBatches);
-
-        if (!viewModel.batchDataList.isEmpty()) {
-            layoutBatchesContainer.removeAllViews();
-            batchCardViews.clear();
-            for (int i = 0; i < viewModel.batchDataList.size(); i++) {
-                BatchViewModel.BatchData batchData = viewModel.batchDataList.get(i);
-                CardView batchCard = (CardView) LayoutInflater.from(this)
-                        .inflate(R.layout.batch_item, layoutBatchesContainer, false);
-
-                TextInputEditText etBatchName = batchCard.findViewById(R.id.etBatchName);
-                RadioGroup rgSection = batchCard.findViewById(R.id.rgSection);
-                TextInputEditText etAcademicYear = batchCard.findViewById(R.id.etAcademicYear);
-                TextInputEditText etTotalSubjects = batchCard.findViewById(R.id.etTotalSubjects);
-                LinearLayout layoutSubjectContainer = batchCard.findViewById(R.id.layoutSubjectContainer);
-
-                etBatchName.setText(batchData.batchName);
-
-                if ("A".equals(batchData.section)) {
-                    rgSection.check(R.id.rbSectionA);
-                } else if ("B".equals(batchData.section)) {
-                    rgSection.check(R.id.rbSectionB);
-                } else {
-                    rgSection.clearCheck();
-                }
-
-                etAcademicYear.setText(batchData.academicYear);
-                etTotalSubjects.setText(batchData.totalSubjects);
-
-                for (BatchViewModel.SubjectTeacher st : batchData.subjectTeachers) {
-                    View subjectRow = LayoutInflater.from(this).inflate(R.layout.subject_row_item, layoutSubjectContainer, false);
-                    Spinner spinnerSubject = subjectRow.findViewById(R.id.spinnerSubject);
-                    Spinner spinnerTeacher = subjectRow.findViewById(R.id.spinnerTeacher);
-
-                    ArrayAdapter<String> subjectAdapter = new ArrayAdapter<>(
-                            this, android.R.layout.simple_spinner_item, allSubjects);
-                    subjectAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
-                    spinnerSubject.setAdapter(subjectAdapter);
-                    int subjPos = allSubjects.indexOf(st.subject);
-                    if (subjPos >= 0) spinnerSubject.setSelection(subjPos);
-
-                    ArrayAdapter<String> teacherAdapter = new ArrayAdapter<>(
-                            this, android.R.layout.simple_spinner_item, allTeachers);
-                    teacherAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
-                    spinnerTeacher.setAdapter(teacherAdapter);
-                    int teachPos = allTeachers.indexOf(st.teacher);
-                    if (teachPos >= 0) spinnerTeacher.setSelection(teachPos);
-
-                    layoutSubjectContainer.addView(subjectRow);
-                }
-
-                layoutBatchesContainer.addView(batchCard);
-                batchCardViews.add(batchCard);
-            }
-        }
-    }
-
-    @Override
-    protected void onPause() {
-        super.onPause();
-        saveToViewModel();
-    }
-
-    // Only called for Generate TT (strict validation)
     private void saveBatchData(Runnable onSuccess) {
         if (batchCardViews.isEmpty()) {
             Toast.makeText(this, "Please generate and fill at least one batch.", Toast.LENGTH_SHORT).show();
@@ -269,6 +199,7 @@ public class BatchActivity extends AppCompatActivity {
         }
 
         List<ParseObject> batchObjects = new ArrayList<>();
+        List<ParseObject> subjectTeacherMappings = new ArrayList<>();
 
         for (View batchCard : batchCardViews) {
             TextInputEditText etBatchName = batchCard.findViewById(R.id.etBatchName);
@@ -293,15 +224,26 @@ public class BatchActivity extends AppCompatActivity {
             }
 
             List<String> subjects = new ArrayList<>();
-            List<String> teachers = new ArrayList<>();
 
             for (int i = 0; i < layoutSubjectContainer.getChildCount(); i++) {
                 View subjectRow = layoutSubjectContainer.getChildAt(i);
                 Spinner spinnerSubject = subjectRow.findViewById(R.id.spinnerSubject);
                 Spinner spinnerTeacher = subjectRow.findViewById(R.id.spinnerTeacher);
 
-                subjects.add(spinnerSubject.getSelectedItem().toString());
-                teachers.add(spinnerTeacher.getSelectedItem().toString());
+                String subject = spinnerSubject.getSelectedItem().toString();
+                String teacher = spinnerTeacher.getSelectedItem().toString();
+
+                subjects.add(subject);
+
+                // Save subject-teacher mapping to BatchSubjectTeacher class
+                ParseObject mapping = new ParseObject("BatchSubjectTeacher");
+                mapping.put("user", ParseUser.getCurrentUser());
+                mapping.put("batchName", batchName);
+                mapping.put("section", section);
+                mapping.put("academicYear", academicYear);
+                mapping.put("subject", subject);
+                mapping.put("teacher", teacher);
+                subjectTeacherMappings.add(mapping);
             }
 
             ParseObject batch = new ParseObject("Batch");
@@ -314,12 +256,18 @@ public class BatchActivity extends AppCompatActivity {
             batchObjects.add(batch);
         }
 
-        ParseObject.saveAllInBackground(batchObjects, e -> {
-            if (e == null) {
-                Toast.makeText(this, "Batches saved!", Toast.LENGTH_SHORT).show();
-                if (onSuccess != null) onSuccess.run();
+        ParseObject.saveAllInBackground(batchObjects, batchError -> {
+            if (batchError == null) {
+                ParseObject.saveAllInBackground(subjectTeacherMappings, mappingError -> {
+                    if (mappingError == null) {
+                        Toast.makeText(this, "Batch and mappings saved!", Toast.LENGTH_SHORT).show();
+                        if (onSuccess != null) onSuccess.run();
+                    } else {
+                        Toast.makeText(this, "Mapping save error: " + mappingError.getMessage(), Toast.LENGTH_SHORT).show();
+                    }
+                });
             } else {
-                Toast.makeText(this, "Save error: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+                Toast.makeText(this, "Batch save error: " + batchError.getMessage(), Toast.LENGTH_SHORT).show();
             }
         });
     }
@@ -332,5 +280,15 @@ public class BatchActivity extends AppCompatActivity {
             if (layoutSubjectContainer.getChildCount() == 0) return false;
         }
         return true;
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+        saveToViewModel();
+    }
+
+    private void restoreViewModel() {
+        // Optional: implement as needed
     }
 }

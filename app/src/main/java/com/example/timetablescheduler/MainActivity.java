@@ -15,6 +15,11 @@ public class MainActivity extends AppCompatActivity {
     private EditText etEmail, etPassword;
     private Button btnLogin, btnSignup;
 
+    // Role emails
+    private static final String ADMIN_EMAIL      = "admin_mca@rvce.edu.in";
+    private static final String DEAN_EMAIL       = "dean_timetable@rvce.edu.in";
+    private static final String PRINCIPAL_EMAIL  = "principal_rvce@rvce.edu.in";
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -30,19 +35,15 @@ public class MainActivity extends AppCompatActivity {
             startActivity(new Intent(this, SignupActivity.class));
         });
 
-        // Auto-login if user exists
+        // Auto-login if already logged in user
         if (ParseUser.getCurrentUser() != null) {
             String currentEmail = ParseUser.getCurrentUser().getUsername();
-            if (isAdmin(currentEmail)) {
-                navigateToAdmin();
-            } else {
-                checkIfFacultyAndNavigate(currentEmail);
-            }
+            navigateByRole(currentEmail);
         }
     }
 
     private void handleLogin() {
-        String email = etEmail.getText().toString().trim();
+        String email = etEmail.getText().toString().trim().toLowerCase();
         String password = etPassword.getText().toString().trim();
 
         if (email.isEmpty() || password.isEmpty()) {
@@ -58,19 +59,27 @@ public class MainActivity extends AppCompatActivity {
 
         ParseUser.logInInBackground(email, password, (user, e) -> {
             if (user != null) {
-                if (isAdmin(email)) {
-                    navigateToAdmin();
-                } else {
-                    checkIfFacultyAndNavigate(email);
-                }
+                navigateByRole(email);
             } else {
                 showToast("Login failed: " + (e != null ? e.getMessage() : "Invalid credentials"));
             }
         });
     }
 
+    private void navigateByRole(String email) {
+        if (email.equalsIgnoreCase(ADMIN_EMAIL)) {
+            navigateToAdmin();
+        } else if (email.equalsIgnoreCase(DEAN_EMAIL)) {
+            navigateToDean();
+        } else if (email.equalsIgnoreCase(PRINCIPAL_EMAIL)) {
+            navigateToPrincipal();
+        } else {
+            // Check Teacher table for faculty, else Welcome
+            checkIfFacultyAndNavigate(email);
+        }
+    }
+
     private void checkIfFacultyAndNavigate(String email) {
-        // Check if the email exists in Teacher table
         ParseQuery<ParseObject> query = ParseQuery.getQuery("Teacher");
         query.whereEqualTo("email", email);
         query.getFirstInBackground((teacher, ex) -> {
@@ -81,23 +90,29 @@ public class MainActivity extends AppCompatActivity {
                 startActivity(intent);
                 finish();
             } else {
-                // Open student/general dashboard
+                // Open student/general dashboard (Welcome screen)
                 navigateToWelcome();
             }
         });
     }
 
-    private boolean isAdmin(String email) {
-        return "admin_mca@rvce.edu.in".equalsIgnoreCase(email);
+    private void navigateToAdmin() {
+        startActivity(new Intent(this, AdminApproveTimetableActivity.class));
+        finish();
+    }
+
+    private void navigateToDean() {
+        startActivity(new Intent(this, DeanApproveTimetableActivity.class));
+        finish();
+    }
+
+    private void navigateToPrincipal() {
+        startActivity(new Intent(this, PrincipalApproveTimetableActivity.class));
+        finish();
     }
 
     private void navigateToWelcome() {
         startActivity(new Intent(this, WelcomeActivity.class));
-        finish();
-    }
-
-    private void navigateToAdmin() {
-        startActivity(new Intent(this, AdminApproveTimetableActivity.class));
         finish();
     }
 

@@ -88,13 +88,13 @@ public class TimetableDisplayActivity extends AppCompatActivity {
                     selectedAcademicYear = timetable.has("academicYear") ? timetable.getString("academicYear") : "";
                     fetchAndShowTimetable(timetable);
                 }
+
                 @Override
                 public void onNothingSelected(AdapterView<?> parent) {
                     clearTimetableUI();
                 }
             });
 
-            // Select first batch by default
             if (!timetableBatches.isEmpty()) {
                 batchSpinner.setSelection(0);
             }
@@ -197,7 +197,6 @@ public class TimetableDisplayActivity extends AppCompatActivity {
 
         int numPeriods = periods.size() + (breaks != null ? breaks.size() : 0);
 
-        // Header Row
         TableRow headerRow = new TableRow(this);
         headerRow.addView(createHeaderCell(""));
         int periodIdx = 0, breakIdx = 0;
@@ -215,7 +214,6 @@ public class TimetableDisplayActivity extends AppCompatActivity {
         }
         tableLayout.addView(headerRow);
 
-        // Data Rows
         for (int day = 0; day < workingDays.size(); day++) {
             TableRow row = new TableRow(this);
             row.addView(createDayCell(workingDays.get(day)));
@@ -237,14 +235,14 @@ public class TimetableDisplayActivity extends AppCompatActivity {
                             params.span = 2;
                             AppCompatTextView labCell = new AppCompatTextView(this);
                             labCell.setLayoutParams(params);
-                            labCell.setText(classInfo[0] + "\nLab");
+                            labCell.setText(classInfo[0] + "\n" + "(" + classInfo[1] + ") Lab");
                             labCell.setGravity(Gravity.CENTER);
                             labCell.setBackgroundResource(R.drawable.cell_box);
                             labCell.setTextSize(18);
                             labCell.setMinHeight(CELL_HEIGHT);
                             labCell.setMinWidth(CELL_WIDTH * 2);
                             row.addView(labCell);
-                            col++; // Skip next period
+                            col++;
                         } else {
                             row.addView(createClassCell(classInfo));
                         }
@@ -297,11 +295,22 @@ public class TimetableDisplayActivity extends AppCompatActivity {
         tv.setGravity(Gravity.CENTER);
         tv.setBackgroundResource(R.drawable.cell_box);
         tv.setTextSize(18);
-        if (classInfo != null && classInfo.length >= 2 && classInfo[0] != null && classInfo[1] != null) {
-            tv.setText(classInfo[0] + "\n" + classInfo[1]);
+
+        if (classInfo != null) {
+            String subject = classInfo[0] != null ? classInfo[0] : "";
+            String teacher = classInfo[1] != null ? classInfo[1] : "";
+
+            if (!subject.isEmpty() && !teacher.isEmpty()) {
+                tv.setText(subject + "\n(" + teacher + ")");
+            } else if (!subject.isEmpty()) {
+                tv.setText(subject);
+            } else {
+                tv.setText("—");
+            }
         } else {
-            tv.setText("");
+            tv.setText("—");
         }
+
         return tv;
     }
 

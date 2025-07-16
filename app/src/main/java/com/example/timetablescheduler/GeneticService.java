@@ -1,3 +1,5 @@
+
+// GeneticService.java
 package com.example.timetablescheduler;
 
 import android.app.IntentService;
@@ -20,7 +22,6 @@ public class GeneticService extends IntentService {
         try {
             ParseUser user = ParseUser.getCurrentUser();
 
-            // Fetch config
             ParseQuery<ParseObject> configQuery = ParseQuery.getQuery("TimetableConfig");
             configQuery.whereEqualTo("user", user);
             configQuery.orderByDescending("createdAt");
@@ -36,7 +37,6 @@ public class GeneticService extends IntentService {
             List<ParseObject> breakObjs = config.getList("breaks");
             int periodsPerDay = periodObjs.size();
 
-            // Build TimeSlot list
             List<TimeSlot> timeSlots = new ArrayList<>();
             for (int dayIdx = 0; dayIdx < workingDays.size(); dayIdx++) {
                 for (int periodIdx = 0; periodIdx < periodsPerDay; periodIdx++) {
@@ -45,7 +45,6 @@ public class GeneticService extends IntentService {
                 }
             }
 
-            // Build break slot set
             Set<String> breakSlotSet = new HashSet<>();
             if (breakObjs != null) {
                 for (int dayIdx = 0; dayIdx < workingDays.size(); dayIdx++) {
@@ -56,45 +55,73 @@ public class GeneticService extends IntentService {
                 }
             }
 
-            // Fetch batches
+            ParseQuery<ParseObject> teacherQuery = ParseQuery.getQuery("Teacher");
+            teacherQuery.whereEqualTo("user", user);
+            List<ParseObject> teacherObjs = teacherQuery.find();
+
+            Map<String, Integer> teacherLoads = new HashMap<>();
+            Map<String, List<String>> teacherSubjects = new HashMap<>();
+            List<String> teachers = new ArrayList<>();
+            for (ParseObject t : teacherObjs) {
+                String name = t.getString("name");
+                teachers.add(name);
+                int load = 20;
+                try { load = Integer.parseInt(t.getString("load")); } catch (Exception ignore) {}
+                teacherLoads.put(name, load);
+                String subjectsStr = t.getString("subjects");
+                List<String> subjects = Arrays.asList(subjectsStr.split(","));
+                teacherSubjects.put(name, subjects);
+            }
+
             ParseQuery<ParseObject> batchQuery = ParseQuery.getQuery("Batch");
             batchQuery.whereEqualTo("user", user);
             List<ParseObject> batchObjs = batchQuery.find();
 
-            // Fetch subjects
             ParseQuery<ParseObject> subjectQuery = ParseQuery.getQuery("Subject");
             subjectQuery.whereEqualTo("user", user);
+            subjectQuery.include("teacher");
             List<ParseObject> subjectObjs = subjectQuery.find();
             Map<String, ParseObject> subjectMap = new HashMap<>();
             for (ParseObject s : subjectObjs) {
                 subjectMap.put(s.getString("name"), s);
             }
 
-            // For each batch, generate and save the best timetable
+            ParseQuery<ParseObject> batchAssignmentQuery = ParseQuery.getQuery("BatchSubjectTeacher");
+            batchAssignmentQuery.whereEqualTo("user", user);
+            List<ParseObject> batchAssignments = batchAssignmentQuery.find();
+
+            Map<String, String> batchSubjectTeacherMap = new HashMap<>();
+            for (ParseObject assignment : batchAssignments) {
+                String batchName = assignment.getString("batchName");
+                String section = assignment.has("section") ? assignment.getString("section") : "";
+                String academicYear = assignment.has("academicYear") ? assignment.getString("academicYear") : "";
+                String subject = assignment.getString("subject");
+                String teacher = assignment.getString("teacher");
+                String key = batchName + "|" + section + "|" + academicYear + "|" + subject;
+                batchSubjectTeacherMap.put(key, teacher);
+            }
+
             for (ParseObject batch : batchObjs) {
                 String batchName = batch.getString("name");
                 String section = batch.has("section") ? batch.getString("section") : "";
                 String academicYear = batch.has("academicYear") ? batch.getString("academicYear") : "";
-
-                List<Map<String, String>> subjectTeachers = batch.getList("subjectTeachers");
-                if (subjectTeachers == null) continue;
+                List<String> subjects = batch.getList("subjects");
+                if (subjects == null) continue;
 
                 List<TimetableClass> classesToSchedule = new ArrayList<>();
-                for (Map<String, String> st : subjectTeachers) {
-                    String subjectName = st.get("subject");
-                    String teacherName = st.get("teacher");
+                for (String subjectName : subjects) {
                     ParseObject subjObj = subjectMap.get(subjectName);
                     if (subjObj == null) continue;
                     int lecturesWeekly = subjObj.has("lecturesWeekly") ? subjObj.getInt("lecturesWeekly") : 0;
                     boolean isLab = subjObj.has("isLab") && subjObj.getBoolean("isLab");
+                    String key = batchName + "|" + section + "|" + academicYear + "|" + subjectName;
+                    String teacherName = batchSubjectTeacherMap.getOrDefault(key, "");
 
-                    // Lectures
                     for (int l = 0; l < lecturesWeekly; l++) {
                         classesToSchedule.add(new TimetableClass(
                                 subjectName, teacherName, batchName, section, null, false, 1, lecturesWeekly, isLab ? 1 : 0
                         ));
                     }
-                    // Labs
                     if (isLab) {
                         classesToSchedule.add(new TimetableClass(
                                 subjectName, teacherName, batchName, section, null, true, 2, lecturesWeekly, 1
@@ -102,17 +129,15 @@ public class GeneticService extends IntentService {
                     }
                 }
 
-                // Run the Genetic Algorithm for this batch
                 GeneticAlgorithm ga = new GeneticAlgorithm(
-                        timeSlots, new HashMap<>(), new HashMap<>(), new ArrayList<>(), periodsPerDay, breakSlotSet
+                        timeSlots, teacherLoads, teacherSubjects, teachers, periodsPerDay, breakSlotSet
                 );
                 Individual solution = ga.generateTimetable(classesToSchedule);
 
-                // Save the result (pass workingDays for day name mapping)
+                Log.d(TAG, "Saving generated timetable for batch: " + batchName);
                 new ParseRepository().saveTimetableForBatch(solution, workingDays, batchName, section, academicYear);
             }
 
-            // Notify UI
             sendBroadcast(new Intent("TIMETABLE_GENERATED"));
             Log.d(TAG, "Broadcast sent");
 

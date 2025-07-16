@@ -13,7 +13,7 @@ import android.view.View;
 import com.parse.*;
 import java.util.*;
 
-public class AdminApproveTimetableActivity extends AppCompatActivity {
+public class DeanApproveTimetableActivity extends AppCompatActivity {
 
     private Spinner batchSpinner;
     private LinearLayout infoLayout;
@@ -24,14 +24,13 @@ public class AdminApproveTimetableActivity extends AppCompatActivity {
     private List<ParseObject> generatedTimetableList = new ArrayList<>();
     private ParseObject selectedTimetable;
     private boolean isApproved = false;
-
     private static final int CELL_HEIGHT = 120;
     private static final int CELL_WIDTH = 180;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        setContentView(R.layout.activity_admin_approve_timetable);
+        setContentView(R.layout.activity_dean_approve_timetable);
 
         batchSpinner = findViewById(R.id.batchSpinner);
         infoLayout = findViewById(R.id.infoLayout);
@@ -54,10 +53,10 @@ public class AdminApproveTimetableActivity extends AppCompatActivity {
     }
 
     private void loadGeneratedTimetables() {
-        ParseQuery<ParseObject> timetableQuery = ParseQuery.getQuery("GeneratedTimetable");
-        // Admin sees all (even already-approved) to allow unapprove.
-        timetableQuery.orderByDescending("createdAt");
-        timetableQuery.findInBackground((timetables, e) -> {
+        ParseQuery<ParseObject> query = ParseQuery.getQuery("GeneratedTimetable");
+        query.whereEqualTo("isApprovedByAdmin", true);
+        query.orderByDescending("createdAt");
+        query.findInBackground((timetables, e) -> {
             if (e == null && timetables != null && !timetables.isEmpty()) {
                 generatedTimetableList = timetables;
                 List<String> batchNames = new ArrayList<>();
@@ -72,21 +71,21 @@ public class AdminApproveTimetableActivity extends AppCompatActivity {
                 adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
                 batchSpinner.setAdapter(adapter);
                 batchSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
-                    @Override public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
-                        ParseObject timetable = generatedTimetableList.get(position);
+                    @Override public void onItemSelected(AdapterView<?> parent, View view, int pos, long id) {
+                        ParseObject timetable = generatedTimetableList.get(pos);
                         selectedBatch = timetable.getString("batch");
                         selectedSection = timetable.has("section") ? timetable.getString("section") : "";
                         selectedAcademicYear = timetable.has("academicYear") ? timetable.getString("academicYear") : "";
                         selectedTimetable = timetable;
-                        isApproved = timetable.has("isApprovedByAdmin") && timetable.getBoolean("isApprovedByAdmin");
+                        isApproved = timetable.has("isApprovedByDean") && timetable.getBoolean("isApprovedByDean");
                         fetchAndShowTimetable();
                     }
-                    @Override public void onNothingSelected(AdapterView<?> parent) { }
+                    @Override public void onNothingSelected(AdapterView<?> parent) {}
                 });
                 messageText.setVisibility(View.GONE);
                 approveButton.setVisibility(View.VISIBLE);
             } else {
-                showMessage("No timetables found.");
+                showMessage("No timetables for Dean approval.");
                 clearTableAndInfo();
                 approveButton.setVisibility(View.GONE);
             }
@@ -152,13 +151,13 @@ public class AdminApproveTimetableActivity extends AppCompatActivity {
     private void toggleApproval() {
         if (selectedTimetable != null) {
             final boolean newApproval = !isApproved;
-            selectedTimetable.put("isApprovedByAdmin", newApproval);
+            selectedTimetable.put("isApprovedByDean", newApproval);
             selectedTimetable.saveInBackground(e -> {
                 if (e == null) {
                     isApproved = newApproval;
                     runOnUiThread(this::updateApproveButton);
                     Toast.makeText(this, isApproved ?
-                            "Timetable approved by Admin!" : "Admin approval removed!", Toast.LENGTH_SHORT).show();
+                            "Timetable approved by Dean!" : "Dean approval removed!", Toast.LENGTH_SHORT).show();
                 } else {
                     Toast.makeText(this, "Operation failed: " + e.getMessage(), Toast.LENGTH_SHORT).show();
                 }
@@ -181,6 +180,7 @@ public class AdminApproveTimetableActivity extends AppCompatActivity {
         messageText.setText(msg);
         messageText.setVisibility(View.VISIBLE);
     }
+
     private void clearTableAndInfo() {
         tableLayout.removeAllViews();
         infoLayout.removeAllViews();
@@ -239,7 +239,6 @@ public class AdminApproveTimetableActivity extends AppCompatActivity {
         }
         tableLayout.addView(headerRow);
 
-        // Data rows
         for (int day = 0; day < workingDays.size(); day++) {
             TableRow row = new TableRow(this);
             row.addView(createHeaderCell(workingDays.get(day)));
@@ -268,7 +267,7 @@ public class AdminApproveTimetableActivity extends AppCompatActivity {
                             labCell.setMinHeight(CELL_HEIGHT);
                             labCell.setMinWidth(CELL_WIDTH * 2);
                             row.addView(labCell);
-                            col++; // Skip next period
+                            col++;
                         } else {
                             row.addView(createClassCell(classInfo));
                         }
