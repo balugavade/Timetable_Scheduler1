@@ -28,6 +28,11 @@ public class FacultyTimetablePrintAdapter extends PrintDocumentAdapter {
     private int contentRowHeight = 44;
     private int topMargin = 90;
     private int leftMargin = 40;
+    private int rightMargin = 40;
+    private int cellPadding = 12;
+
+    // For column width calculation
+    private int[] colWidths;
 
     public FacultyTimetablePrintAdapter(Context context, TableLayout tableLayout, String teacherName) {
         this.context = context;
@@ -37,7 +42,6 @@ public class FacultyTimetablePrintAdapter extends PrintDocumentAdapter {
     }
 
     private void extractTableData() {
-        // Extract text data from each row/cell of the table
         tableData.clear();
         int nRows = tableLayout.getChildCount();
         for (int i = 0; i < nRows; i++) {
@@ -50,7 +54,7 @@ public class FacultyTimetablePrintAdapter extends PrintDocumentAdapter {
                     if (cell instanceof TextView) {
                         rowData.add(((TextView) cell).getText().toString());
                     } else {
-                        rowData.add(""); // Blank if not a TextView
+                        rowData.add("");
                     }
                 }
                 tableData.add(rowData);
@@ -63,11 +67,15 @@ public class FacultyTimetablePrintAdapter extends PrintDocumentAdapter {
                          android.os.CancellationSignal cancellationSignal,
                          LayoutResultCallback callback, Bundle extras) {
         pdfDocument = new PrintedPdfDocument(context, newAttributes);
-        pageHeight = newAttributes.getMediaSize().getHeightMils() * 72 / 1000; // mils to points
+        pageHeight = newAttributes.getMediaSize().getHeightMils() * 72 / 1000;
         pageWidth = newAttributes.getMediaSize().getWidthMils() * 72 / 1000;
-        // Estimate rowsPerPage: header rows, page title, margins, etc.
+
+        measureColumnWidths();
+
+        // Estimate rows per page
         int availableHeight = pageHeight - topMargin - 40; // 40 for bottom margin
         rowsPerPage = Math.max(1, (availableHeight - headerRowHeight) / contentRowHeight);
+
         PrintDocumentInfo info = new PrintDocumentInfo
                 .Builder("faculty_timetable.pdf")
                 .setContentType(PrintDocumentInfo.CONTENT_TYPE_DOCUMENT)
@@ -75,14 +83,61 @@ public class FacultyTimetablePrintAdapter extends PrintDocumentAdapter {
         callback.onLayoutFinished(info, true);
     }
 
+    private void measureColumnWidths() {
+        if (tableData.isEmpty()) return;
+        int colCount = tableData.get(0).size();
+        colWidths = new int[colCount];
+
+        // Use a paint object to measure text width
+        Paint paint = new Paint();
+        paint.setTextSize(16f); // standard for content
+        paint.setTypeface(Typeface.DEFAULT);
+
+        // First, measure headers (bold)
+        Paint headerPaint = new Paint(paint);
+        headerPaint.setTypeface(Typeface.DEFAULT_BOLD);
+
+        for (int c = 0; c < colCount; c++) {
+            String text = tableData.get(0).get(c);
+            float width = headerPaint.measureText(text);
+            colWidths[c] = (int) width + 2 * cellPadding;
+        }
+        // Now, scan all data rows
+        for (int r = 1; r < tableData.size(); r++) {
+            List<String> row = tableData.get(r);
+            for (int c = 0; c < colCount; c++) {
+                String text = row.get(c);
+                float width = paint.measureText(text);
+                if ((int) width + 2 * cellPadding > colWidths[c]) {
+                    colWidths[c] = (int) width + 2 * cellPadding;
+                }
+            }
+        }
+
+        // Now, check if total width exceeds page width, and scale down if needed
+        int tableWidth = 0;
+        for (int w : colWidths) tableWidth += w;
+        int maxTableWidth = pageWidth - leftMargin - rightMargin;
+        if (tableWidth > maxTableWidth) {
+            float scale = (float) maxTableWidth / (float) tableWidth;
+            for (int i = 0; i < colCount; i++) {
+                colWidths[i] = Math.round(colWidths[i] * scale);
+            }
+        }
+    }
+
     @Override
     public void onWrite(android.print.PageRange[] pages,
                         android.os.ParcelFileDescriptor destination,
                         android.os.CancellationSignal cancellationSignal,
                         WriteResultCallback callback) {
+        if (tableData.isEmpty() || colWidths == null) {
+            callback.onWriteFinished(new android.print.PageRange[]{android.print.PageRange.ALL_PAGES});
+            return;
+        }
+
         int totalRows = tableData.size();
-        int pageCount = (int) Math.ceil((double) (totalRows - 1) / rowsPerPage); // -1 for header
-        int rowIndex = 0;
+        int pageCount = (int) Math.ceil((double) (totalRows - 1) / rowsPerPage);
 
         for (int pageNum = 0; pageNum < pageCount; pageNum++) {
             PdfDocument.Page page = pdfDocument.startPage(pageNum);
@@ -103,7 +158,7 @@ public class FacultyTimetablePrintAdapter extends PrintDocumentAdapter {
             y += 36;
             canvas.drawText("Name: " + (teacherName != null ? teacherName : ""), leftMargin, y, headerPaint);
 
-            y += 30;
+            y += 30; // space under title
 
             // Draw table header
             Paint cellPaint = new Paint();
@@ -117,49 +172,53 @@ public class FacultyTimetablePrintAdapter extends PrintDocumentAdapter {
             textPaint.setTypeface(Typeface.DEFAULT_BOLD);
 
             int x = leftMargin;
-            int colCount = tableData.get(0).size();
-            int[] colWidths = new int[colCount];
+            int colCount = colWidths.length;
 
-            // Estimate column widths (divide evenly)
-            int tableWidth = pageWidth - 2 * leftMargin;
-            for (int c = 0; c < colCount; c++) {
-                colWidths[c] = tableWidth / colCount;
-            }
-
-            // Header row
+            // Calculate starting cell positions
             List<String> headerRow = tableData.get(0);
-            int cellTop = y + 16;
-            int cellLeft = x;
+            int cellTop = y + 12;
             int cellBottom = cellTop + headerRowHeight;
-            int cellRight;
 
             for (int c = 0; c < colCount; c++) {
-                cellRight = cellLeft + colWidths[c];
+                int cellLeft = x;
+                int cellRight = x + colWidths[c];
                 // Cell rect
                 canvas.drawRect(cellLeft, cellTop, cellRight, cellBottom, cellPaint);
-                // Header text
-                canvas.drawText(headerRow.get(c), cellLeft + 16, cellTop + headerRowHeight / 2 + 6, textPaint);
-                cellLeft = cellRight;
+
+                // Center header text in cell
+                String text = headerRow.get(c);
+                float textWidth = textPaint.measureText(text);
+                float tx = cellLeft + (colWidths[c] - textWidth) / 2;
+                float ty = cellTop + (headerRowHeight + textPaint.getTextSize()/2) / 2 + 3;
+                canvas.drawText(text, tx, ty, textPaint);
+
+                x = cellRight;
             }
             y = cellBottom;
 
             textPaint.setTypeface(Typeface.DEFAULT);
 
-            // Content rows for this page
+            // Rows for this page
             int start = 1 + pageNum * rowsPerPage;
             int end = Math.min(start + rowsPerPage, totalRows);
 
             for (int r = start; r < end; r++) {
                 List<String> row = tableData.get(r);
-                cellLeft = x;
+                x = leftMargin;
                 cellBottom = y + contentRowHeight;
                 for (int c = 0; c < colCount; c++) {
-                    cellRight = cellLeft + colWidths[c];
-                    // Cell rect
+                    int cellLeft = x;
+                    int cellRight = x + colWidths[c];
                     canvas.drawRect(cellLeft, y, cellRight, cellBottom, cellPaint);
-                    // Cell text
-                    canvas.drawText(row.get(c), cellLeft + 12, y + contentRowHeight / 2 + 6, textPaint);
-                    cellLeft = cellRight;
+
+                    // Center cell text
+                    String text = row.get(c);
+                    float textWidth = textPaint.measureText(text);
+                    float tx = cellLeft + (colWidths[c] - textWidth) / 2;
+                    float ty = y + (contentRowHeight + textPaint.getTextSize()/2) / 2 + 2;
+                    canvas.drawText(text, tx, ty, textPaint);
+
+                    x = cellRight;
                 }
                 y = cellBottom;
             }

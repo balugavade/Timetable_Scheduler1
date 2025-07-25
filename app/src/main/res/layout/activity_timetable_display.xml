@@ -10,13 +10,11 @@
         android:layout_height="0dp"
         android:layout_weight="1"
         android:fillViewport="true">
-
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
             android:padding="16dp">
-
             <LinearLayout
                 android:id="@+id/infoLayout"
                 android:layout_width="match_parent"
@@ -24,13 +22,11 @@
                 android:orientation="vertical"
                 android:gravity="center"
                 android:paddingBottom="8dp"/>
-
             <Spinner
                 android:id="@+id/batchSpinner"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginBottom="8dp"/>
-
             <Button
                 android:id="@+id/printButton"
                 android:layout_width="wrap_content"
@@ -38,12 +34,10 @@
                 android:text="Print/Download PDF"
                 android:layout_gravity="center"
                 android:layout_marginBottom="16dp"/>
-
             <HorizontalScrollView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:fillViewport="true">
-
                 <TableLayout
                     android:id="@+id/timetableTable"
                     android:layout_width="wrap_content"
@@ -54,15 +48,25 @@
         </LinearLayout>
     </ScrollView>
 
-    <!-- Small, Centered Exit Button at the bottom -->
-    <Button
-        android:id="@+id/exitButton"
-        android:layout_width="wrap_content"
+    <!-- Save (left) and Exit (right) buttons, fixed at screen bottom -->
+    <LinearLayout
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Exit"
-        android:textSize="14sp"
-        android:paddingLeft="24dp"
-        android:paddingRight="24dp"
-        android:layout_margin="16dp"
-        android:layout_gravity="center_horizontal"/>
+        android:orientation="horizontal"
+        android:layout_margin="16dp">
+        <Button
+            android:id="@+id/saveButton"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_marginRight="8dp"
+            android:text="Save Changes"/>
+        <Button
+            android:id="@+id/exitButton"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_marginLeft="8dp"
+            android:text="Exit"/>
+    </LinearLayout>
 </LinearLayout>

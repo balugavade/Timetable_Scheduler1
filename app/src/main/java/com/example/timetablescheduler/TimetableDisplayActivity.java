@@ -1,16 +1,16 @@
 package com.example.timetablescheduler;
 
+import android.app.AlertDialog;
 import android.content.Context;
-import android.content.Intent;
-import android.print.PrintManager;
 import android.os.Bundle;
-import android.util.Log;
+import android.print.PrintManager;
 import android.view.Gravity;
 import android.view.View;
 import android.widget.*;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.widget.AppCompatTextView;
 import androidx.core.content.ContextCompat;
+import com.example.timetablescheduler.models.TimetableEdit;
 import com.parse.*;
 import java.util.*;
 
@@ -18,14 +18,16 @@ public class TimetableDisplayActivity extends AppCompatActivity {
     private TableLayout tableLayout;
     private LinearLayout infoLayout;
     private Spinner batchSpinner;
-    private Button printButton;
-    private Button exitButton;
-    private String selectedBatch, selectedSection, selectedAcademicYear;
-    private static final String TAG = "TimetableDisplay";
+    private Button printButton, exitButton, saveButton;
+    private static final int CELL_HEIGHT = 120, CELL_WIDTH = 180;
 
     private List<ParseObject> timetableBatches = new ArrayList<>();
-    private static final int CELL_HEIGHT = 120;
-    private static final int CELL_WIDTH = 180;
+    private Map<String, TimetableEdit> manualEdits = new HashMap<>(); // Key: dayIdx_colIdx
+    private List<String> workingDays;
+    private List<ParseObject> periods, breaks;
+    private String selectedBatch, selectedSection, selectedAcademicYear;
+    private ParseObject selectedTimetableObj;
+    private Map<String, ParseObject> backendEntryMap = new HashMap<>();
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -37,22 +39,19 @@ public class TimetableDisplayActivity extends AppCompatActivity {
         batchSpinner = findViewById(R.id.batchSpinner);
         printButton = findViewById(R.id.printButton);
         exitButton = findViewById(R.id.exitButton);
+        saveButton = findViewById(R.id.saveButton);
 
         printButton.setOnClickListener(v -> printTimetable());
-        exitButton.setOnClickListener(v -> {
-            Intent intent = new Intent(TimetableDisplayActivity.this, WelcomeActivity.class);
-            startActivity(intent);
-            finish();
-        });
-
+        exitButton.setOnClickListener(v -> finish());
+        saveButton.setOnClickListener(v -> saveManualEdits());
         loadBatchListWithTimetables();
     }
 
     private void loadBatchListWithTimetables() {
-        ParseQuery<ParseObject> timetableQuery = ParseQuery.getQuery("GeneratedTimetable");
-        timetableQuery.whereEqualTo("user", ParseUser.getCurrentUser());
-        timetableQuery.orderByDescending("createdAt");
-        timetableQuery.findInBackground((timetables, e) -> {
+        ParseQuery<ParseObject> query = ParseQuery.getQuery("GeneratedTimetable");
+        query.whereEqualTo("user", ParseUser.getCurrentUser());
+        query.orderByDescending("createdAt");
+        query.findInBackground((timetables, e) -> {
             if (e != null || timetables == null || timetables.isEmpty()) {
                 timetableBatches.clear();
                 batchSpinner.setAdapter(null);
@@ -60,44 +59,29 @@ public class TimetableDisplayActivity extends AppCompatActivity {
                 Toast.makeText(this, "No generated timetables found.", Toast.LENGTH_SHORT).show();
                 return;
             }
-
             List<String> batchNames = new ArrayList<>();
             timetableBatches.clear();
-
             for (ParseObject timetable : timetables) {
                 String batchName = timetable.getString("batch");
                 String section = timetable.has("section") ? timetable.getString("section") : "";
                 String year = timetable.has("academicYear") ? timetable.getString("academicYear") : "";
-                String displayName = batchName;
-                if (!section.isEmpty()) displayName += " - " + section;
-                if (!year.isEmpty()) displayName += " (" + year + ")";
-                batchNames.add(displayName);
+                batchNames.add(batchName + (section.isEmpty() ? "" : " - " + section) + (year.isEmpty() ? "" : " (" + year + ")"));
                 timetableBatches.add(timetable);
             }
-
             ArrayAdapter<String> adapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item, batchNames);
             adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
             batchSpinner.setAdapter(adapter);
-
             batchSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
-                @Override
-                public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
-                    ParseObject timetable = timetableBatches.get(position);
-                    selectedBatch = timetable.getString("batch");
-                    selectedSection = timetable.has("section") ? timetable.getString("section") : "";
-                    selectedAcademicYear = timetable.has("academicYear") ? timetable.getString("academicYear") : "";
-                    fetchAndShowTimetable(timetable);
+                @Override public void onItemSelected(AdapterView<?> parent, View view, int pos, long id) {
+                    selectedTimetableObj = timetableBatches.get(pos);
+                    selectedBatch = selectedTimetableObj.getString("batch");
+                    selectedSection = selectedTimetableObj.has("section") ? selectedTimetableObj.getString("section") : "";
+                    selectedAcademicYear = selectedTimetableObj.has("academicYear") ? selectedTimetableObj.getString("academicYear") : "";
+                    fetchAndShowTimetable(selectedTimetableObj);
                 }
-
-                @Override
-                public void onNothingSelected(AdapterView<?> parent) {
-                    clearTimetableUI();
-                }
+                @Override public void onNothingSelected(AdapterView<?> parent) { clearTimetableUI(); }
             });
-
-            if (!timetableBatches.isEmpty()) {
-                batchSpinner.setSelection(0);
-            }
+            if (!timetableBatches.isEmpty()) batchSpinner.setSelection(0);
         });
     }
 
@@ -108,108 +92,56 @@ public class TimetableDisplayActivity extends AppCompatActivity {
         configQuery.setLimit(1);
         configQuery.include("breaks");
         configQuery.include("periods");
-
         configQuery.getFirstInBackground((config, configErr) -> {
-            if (config == null || configErr != null) {
-                clearTimetableUI();
-                return;
-            }
-            List<String> workingDays = config.getList("workingDays");
-            List<ParseObject> periods = config.getList("periods");
-            List<ParseObject> breaks = config.getList("breaks");
-            int numDays = workingDays.size();
-            int numPeriods = periods.size() + (breaks != null ? breaks.size() : 0);
+            if (config == null || configErr != null) { clearTimetableUI(); return; }
+            workingDays = config.getList("workingDays");
+            periods = config.getList("periods");
+            breaks = config.getList("breaks");
+            int numDays = workingDays.size(), numPeriods = periods.size() + (breaks != null ? breaks.size() : 0);
 
             ParseQuery<ParseObject> entryQuery = ParseQuery.getQuery("TimetableEntry");
             entryQuery.whereEqualTo("timetable", timetable);
             entryQuery.findInBackground((entries, err) -> {
-                if (err != null || entries == null || entries.isEmpty()) {
-                    clearTimetableUI();
-                    Toast.makeText(this, "No timetable entries found.", Toast.LENGTH_SHORT).show();
-                    return;
-                }
-                String[][][] timetableData = new String[numDays][numPeriods][3];
-                for (ParseObject entry : entries) {
-                    String dayStr = entry.getString("day");
-                    int dayIdx = workingDays.indexOf(dayStr);
+                backendEntryMap.clear();
+                if (entries != null) for (ParseObject entry : entries) {
+                    int dayIdx = workingDays.indexOf(entry.getString("day"));
                     int periodIdx = entry.getInt("period") - 1;
                     int colIdx = getPeriodColIndex(periodIdx, breaks);
-                    String subject = entry.getString("subject");
-                    String teacher = entry.getString("teacher");
-                    boolean isLab = entry.has("isLab") && entry.getBoolean("isLab");
-                    if (dayIdx >= 0 && dayIdx < numDays && colIdx >= 0 && colIdx < numPeriods) {
-                        timetableData[dayIdx][colIdx][0] = subject;
-                        timetableData[dayIdx][colIdx][1] = teacher;
-                        timetableData[dayIdx][colIdx][2] = String.valueOf(isLab);
-                    }
+                    backendEntryMap.put(dayIdx + "_" + colIdx, entry);
                 }
-                runOnUiThread(() -> renderTimetable(tableLayout, workingDays, periods, breaks, timetableData));
+                renderTimetable(tableLayout, workingDays, periods, breaks, backendEntryMap);
             });
         });
     }
 
-    private void clearTimetableUI() {
-        tableLayout.removeAllViews();
-        infoLayout.removeAllViews();
-    }
-
-    private int getPeriodColIndex(int periodIdx, List<ParseObject> breaks) {
-        int offset = 0;
-        if (breaks != null) {
-            for (ParseObject br : breaks) {
-                int breakAfter = br.has("breakAfterPeriod") ? br.getInt("breakAfterPeriod") : -1;
-                if (breakAfter != -1 && periodIdx >= breakAfter) offset++;
-            }
-        }
-        return periodIdx + offset;
-    }
-
-    private boolean isBreakCol(int colIdx, List<ParseObject> breaks) {
-        if (breaks == null) return false;
-        int runningCol = 0;
-        for (ParseObject br : breaks) {
-            int breakAfter = br.has("breakAfterPeriod") ? br.getInt("breakAfterPeriod") : -1;
-            int breakCol = breakAfter + runningCol;
-            if (colIdx == breakCol) return true;
-            runningCol++;
-        }
-        return false;
-    }
-
     private void renderTimetable(
-            TableLayout tableLayout,
-            List<String> workingDays,
-            List<ParseObject> periods,
-            List<ParseObject> breaks,
-            String[][][] timetableData
+            TableLayout tableLayout, List<String> workingDays, List<ParseObject> periods, List<ParseObject> breaks,
+            Map<String, ParseObject> entryMap
     ) {
         tableLayout.removeAllViews();
         infoLayout.removeAllViews();
-
         String info = "Batch: " + selectedBatch;
-        if (selectedSection != null && !selectedSection.isEmpty()) info += " | Section: " + selectedSection;
-        if (selectedAcademicYear != null && !selectedAcademicYear.isEmpty()) info += " | Academic Year: " + selectedAcademicYear;
+        if (!selectedSection.isEmpty()) info += " | Section: " + selectedSection;
+        if (!selectedAcademicYear.isEmpty()) info += " | Academic Year: " + selectedAcademicYear;
         TextView infoText = new TextView(this);
         infoText.setText(info);
         infoText.setTextSize(20);
         infoText.setGravity(Gravity.CENTER);
         infoLayout.addView(infoText);
-
         int numPeriods = periods.size() + (breaks != null ? breaks.size() : 0);
-
         TableRow headerRow = new TableRow(this);
         headerRow.addView(createHeaderCell(""));
-        int periodIdx = 0, breakIdx = 0;
+
+        int periodIdx, breakIdx;
+        periodIdx = breakIdx = 0;
         for (int col = 0; col < numPeriods; col++) {
             boolean isBreak = isBreakCol(col, breaks);
             if (isBreak) {
                 ParseObject br = breaks.get(breakIdx++);
-                String label = "Break\n" + br.getString("startTime") + "-" + br.getString("endTime");
-                headerRow.addView(createBreakHeaderCell(label));
+                headerRow.addView(createBreakHeaderCell("Break\n" + br.getString("startTime") + "-" + br.getString("endTime")));
             } else {
                 ParseObject period = periods.get(periodIdx++);
-                String label = period.getString("startTime") + "-" + period.getString("endTime");
-                headerRow.addView(createHeaderCell(label));
+                headerRow.addView(createHeaderCell(period.getString("startTime") + "-" + period.getString("endTime")));
             }
         }
         tableLayout.addView(headerRow);
@@ -217,131 +149,215 @@ public class TimetableDisplayActivity extends AppCompatActivity {
         for (int day = 0; day < workingDays.size(); day++) {
             TableRow row = new TableRow(this);
             row.addView(createDayCell(workingDays.get(day)));
-            periodIdx = 0;
-            breakIdx = 0;
+            periodIdx = breakIdx = 0;
             for (int col = 0; col < numPeriods; col++) {
                 boolean isBreak = isBreakCol(col, breaks);
                 if (isBreak) {
                     ParseObject br = breaks.get(breakIdx++);
                     row.addView(createBreakCell(br.getString("startTime") + "-" + br.getString("endTime")));
                 } else {
-                    String[] classInfo = timetableData[day][col];
-                    if (classInfo == null || classInfo[0] == null) {
-                        row.addView(createEmptyCell());
+                    String key = day + "_" + col;
+                    ParseObject entry = entryMap.get(key);
+                    String objectId = (entry != null) ? entry.getObjectId() : null;
+                    String subject = (entry != null) ? entry.getString("subject") : "";
+                    String teacher = (entry != null) ? entry.getString("teacher") : "";
+                    boolean isLab = (entry != null && entry.has("isLab") && entry.getBoolean("isLab"));
+                    if (manualEdits.containsKey(key)) {
+                        subject = manualEdits.get(key).getSubject();
+                        teacher = manualEdits.get(key).getTeacher();
+                        isLab = manualEdits.get(key).isLab();
+                    }
+                    final int finalDay = day, finalPeriod = periodIdx, finalCol = col;
+                    final String finalObjectId = objectId, finalSubject = subject, finalTeacher = teacher;
+                    final boolean finalIsLab = isLab;
+                    if (finalIsLab && col + 1 < numPeriods && !isBreakCol(col + 1, breaks)) {
+                        TableRow.LayoutParams params = new TableRow.LayoutParams();
+                        params.span = 2;
+                        AppCompatTextView labCell = new AppCompatTextView(this);
+                        labCell.setLayoutParams(params);
+                        labCell.setText(finalSubject.isEmpty() ? "—\n(—)" : finalSubject + "\n(" + finalTeacher + ") Lab");
+                        labCell.setGravity(Gravity.CENTER);
+                        labCell.setBackgroundResource(R.drawable.cell_box);
+                        labCell.setTextSize(18);
+                        labCell.setMinHeight(CELL_HEIGHT);
+                        labCell.setMinWidth(CELL_WIDTH * 2);
+                        labCell.setOnLongClickListener(v -> {
+                            showEditDialog(finalDay, finalPeriod, finalCol, finalSubject, finalTeacher, true, finalObjectId);
+                            return true;
+                        });
+                        row.addView(labCell);
+                        col++;
                     } else {
-                        boolean isLab = classInfo[2] != null && Boolean.parseBoolean(classInfo[2]);
-                        if (isLab && col + 1 < numPeriods && !isBreakCol(col + 1, breaks)) {
-                            TableRow.LayoutParams params = new TableRow.LayoutParams();
-                            params.span = 2;
-                            AppCompatTextView labCell = new AppCompatTextView(this);
-                            labCell.setLayoutParams(params);
-                            labCell.setText(classInfo[0] + "\n" + "(" + classInfo[1] + ") Lab");
-                            labCell.setGravity(Gravity.CENTER);
-                            labCell.setBackgroundResource(R.drawable.cell_box);
-                            labCell.setTextSize(18);
-                            labCell.setMinHeight(CELL_HEIGHT);
-                            labCell.setMinWidth(CELL_WIDTH * 2);
-                            row.addView(labCell);
-                            col++;
-                        } else {
-                            row.addView(createClassCell(classInfo));
-                        }
+                        AppCompatTextView classCell = createClassCell(finalSubject, finalTeacher);
+                        classCell.setOnLongClickListener(v -> {
+                            showEditDialog(finalDay, finalPeriod, finalCol, finalSubject, finalTeacher, false, finalObjectId);
+                            return true;
+                        });
+                        row.addView(classCell);
                     }
                 }
+                periodIdx++;
             }
             tableLayout.addView(row);
         }
     }
 
+    private void showEditDialog(
+            int dayIdx, int periodIdx, int colIdx, String subject, String teacher, boolean isLab, String objectId
+    ) {
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        builder.setTitle("Edit Timetable Entry");
+        View view = getLayoutInflater().inflate(R.layout.dialog_edit_timetable, null);
+        EditText etSubject = view.findViewById(R.id.etSubject);
+        EditText etTeacher = view.findViewById(R.id.etTeacher);
+        CheckBox cbLab = view.findViewById(R.id.cbLab);
+        etSubject.setText(subject); etTeacher.setText(teacher); cbLab.setChecked(isLab);
+        builder.setView(view);
+        builder.setPositiveButton("Save", (dialog, which) -> {
+            String newSubject = etSubject.getText().toString().trim(), newTeacher = etTeacher.getText().toString().trim();
+            boolean newIsLab = cbLab.isChecked();
+            String key = dayIdx + "_" + colIdx;
+            manualEdits.put(key, new TimetableEdit(objectId, newSubject, newTeacher, newIsLab,
+                    dayIdx, periodIdx, colIdx, selectedBatch, selectedSection, selectedAcademicYear));
+            renderTimetable(tableLayout, workingDays, periods, breaks, backendEntryMap); // Refresh for instant view
+        });
+        builder.setNegativeButton("Cancel", null);
+        builder.show();
+    }
+
+    private void saveManualEdits() {
+        if (manualEdits.isEmpty()) {
+            Toast.makeText(this, "No changes to save.", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        List<String> toDeleteIds = new ArrayList<>();
+        for (TimetableEdit edit : manualEdits.values()) {
+            if (edit.getObjectId() != null && edit.getSubject().isEmpty() && edit.getTeacher().isEmpty()) {
+                toDeleteIds.add(edit.getObjectId());
+            }
+        }
+        List<String> toUpdateIds = new ArrayList<>();
+        Map<String, TimetableEdit> toUpdateEdits = new HashMap<>();
+        for (TimetableEdit edit : manualEdits.values()) {
+            if (edit.getObjectId() != null && (!edit.getSubject().isEmpty() || !edit.getTeacher().isEmpty())) {
+                toUpdateIds.add(edit.getObjectId());
+                toUpdateEdits.put(edit.getObjectId(), edit);
+            }
+        }
+        List<TimetableEdit> toCreate = new ArrayList<>();
+        for (TimetableEdit edit : manualEdits.values()) {
+            if (edit.getObjectId() == null && (!edit.getSubject().isEmpty() || !edit.getTeacher().isEmpty())) {
+                toCreate.add(edit);
+            }
+        }
+        // --- 1. Delete ---
+        if (!toDeleteIds.isEmpty()) {
+            ParseQuery<ParseObject> deleteQuery = ParseQuery.getQuery("TimetableEntry");
+            deleteQuery.whereContainedIn("objectId", toDeleteIds);
+            deleteQuery.findInBackground((objects, e) -> {
+                if (e == null && objects != null) ParseObject.deleteAllInBackground(objects);
+            });
+        }
+        // --- 2. Update ---
+        if (!toUpdateIds.isEmpty()) {
+            ParseQuery<ParseObject> updateQuery = ParseQuery.getQuery("TimetableEntry");
+            updateQuery.whereContainedIn("objectId", toUpdateIds);
+            updateQuery.findInBackground((objects, e) -> {
+                if (e != null || objects == null) return;
+                List<ParseObject> toSave = new ArrayList<>();
+                for (ParseObject entry : objects) {
+                    TimetableEdit edit = toUpdateEdits.get(entry.getObjectId());
+                    if (edit != null) {
+                        entry.put("subject", edit.getSubject());
+                        entry.put("teacher", edit.getTeacher());
+                        entry.put("isLab", edit.isLab());
+                        toSave.add(entry);
+                    }
+                }
+                ParseObject.saveAllInBackground(toSave);
+            });
+        }
+        // --- 3. Create ---
+        if (!toCreate.isEmpty()) {
+            for (TimetableEdit edit : toCreate) {
+                ParseObject newEntry = new ParseObject("TimetableEntry");
+                newEntry.put("subject", edit.getSubject());
+                newEntry.put("teacher", edit.getTeacher());
+                newEntry.put("isLab", edit.isLab());
+                newEntry.put("day", workingDays.get(edit.getDayIdx()));
+                newEntry.put("period", edit.getPeriodIdx() + 1); // 1-based
+                newEntry.put("timetable", ParseObject.createWithoutData("GeneratedTimetable", selectedTimetableObj.getObjectId()));
+                newEntry.put("batch", edit.getBatchName());
+                if (!edit.getSection().isEmpty()) newEntry.put("section", edit.getSection());
+                if (!edit.getAcademicYear().isEmpty()) newEntry.put("academicYear", edit.getAcademicYear());
+                newEntry.saveInBackground();
+            }
+        }
+        manualEdits.clear();
+        fetchAndShowTimetable(selectedTimetableObj);
+        Toast.makeText(this, "All changes saved & timetable reloaded.", Toast.LENGTH_SHORT).show();
+    }
+
+    private void clearTimetableUI() { tableLayout.removeAllViews(); infoLayout.removeAllViews(); }
+    private int getPeriodColIndex(int periodIdx, List<ParseObject> breaks) {
+        if (breaks == null) return periodIdx;
+        int offset = 0;
+        for (ParseObject br : breaks) {
+            int breakAfter = br.getInt("breakAfterPeriod");
+            if (periodIdx >= breakAfter) offset++;
+        }
+        return periodIdx + offset;
+    }
+    private boolean isBreakCol(int colIdx, List<ParseObject> breaks) {
+        if (breaks == null) return false;
+        int runningCol = 0;
+        for (ParseObject br : breaks) {
+            int breakAfter = br.getInt("breakAfterPeriod");
+            int breakCol = breakAfter + runningCol;
+            if (colIdx == breakCol) return true;
+            runningCol++;
+        }
+        return false;
+    }
     private AppCompatTextView createHeaderCell(String text) {
         AppCompatTextView tv = new AppCompatTextView(this);
-        tv.setText(text);
-        tv.setPadding(12, 16, 12, 16);
-        tv.setTextSize(16);
-        tv.setGravity(Gravity.CENTER);
+        tv.setText(text); tv.setPadding(12,16,12,16); tv.setTextSize(16); tv.setGravity(Gravity.CENTER);
         tv.setBackgroundColor(ContextCompat.getColor(this, R.color.header_background));
         tv.setTextColor(ContextCompat.getColor(this, android.R.color.black));
-        tv.setMinWidth(CELL_WIDTH);
-        tv.setMinHeight(CELL_HEIGHT);
-        tv.setBackgroundResource(R.drawable.cell_box);
-        return tv;
+        tv.setMinWidth(CELL_WIDTH); tv.setMinHeight(CELL_HEIGHT);
+        tv.setBackgroundResource(R.drawable.cell_box); return tv;
     }
-
     private AppCompatTextView createBreakHeaderCell(String text) {
         AppCompatTextView tv = createHeaderCell(text);
-        tv.setBackgroundColor(ContextCompat.getColor(this, R.color.break_background));
-        return tv;
+        tv.setBackgroundColor(ContextCompat.getColor(this, R.color.break_background)); return tv;
     }
-
     private AppCompatTextView createDayCell(String dayName) {
         AppCompatTextView tv = new AppCompatTextView(this);
-        tv.setText(dayName);
-        tv.setPadding(16, 20, 16, 20);
-        tv.setTextSize(16);
-        tv.setGravity(Gravity.CENTER);
+        tv.setText(dayName); tv.setPadding(16,20,16,20); tv.setTextSize(16); tv.setGravity(Gravity.CENTER);
         tv.setBackgroundColor(ContextCompat.getColor(this, R.color.day_background));
         tv.setTextColor(ContextCompat.getColor(this, android.R.color.black));
-        tv.setMinWidth(CELL_WIDTH);
-        tv.setMinHeight(CELL_HEIGHT);
-        tv.setBackgroundResource(R.drawable.cell_box);
-        return tv;
+        tv.setMinWidth(CELL_WIDTH); tv.setMinHeight(CELL_HEIGHT);
+        tv.setBackgroundResource(R.drawable.cell_box); return tv;
     }
-
-    private AppCompatTextView createClassCell(String[] classInfo) {
+    private AppCompatTextView createClassCell(String subject, String teacher) {
         AppCompatTextView tv = new AppCompatTextView(this);
-        tv.setMinHeight(CELL_HEIGHT);
-        tv.setMinWidth(CELL_WIDTH);
-        tv.setPadding(16, 16, 16, 16);
-        tv.setGravity(Gravity.CENTER);
-        tv.setBackgroundResource(R.drawable.cell_box);
-        tv.setTextSize(18);
-
-        if (classInfo != null) {
-            String subject = classInfo[0] != null ? classInfo[0] : "";
-            String teacher = classInfo[1] != null ? classInfo[1] : "";
-
-            if (!subject.isEmpty() && !teacher.isEmpty()) {
-                tv.setText(subject + "\n(" + teacher + ")");
-            } else if (!subject.isEmpty()) {
-                tv.setText(subject);
-            } else {
-                tv.setText("—");
-            }
-        } else {
-            tv.setText("—");
-        }
-
+        tv.setMinHeight(CELL_HEIGHT); tv.setMinWidth(CELL_WIDTH); tv.setPadding(16,16,16,16);
+        tv.setGravity(Gravity.CENTER); tv.setBackgroundResource(R.drawable.cell_box); tv.setTextSize(18);
+        if (subject.isEmpty() && teacher.isEmpty()) { tv.setText("—"); }
+        else if (!subject.isEmpty() && !teacher.isEmpty()) { tv.setText(subject + "\n(" + teacher + ")"); }
+        else if (!subject.isEmpty()) { tv.setText(subject); }
+        else { tv.setText("—"); }
         return tv;
     }
-
     private AppCompatTextView createBreakCell(String label) {
         AppCompatTextView tv = new AppCompatTextView(this);
-        tv.setText("Break\n" + label);
-        tv.setMinHeight(CELL_HEIGHT);
-        tv.setMinWidth(CELL_WIDTH);
-        tv.setGravity(Gravity.CENTER);
-        tv.setTextSize(16);
+        tv.setText("Break\n" + label); tv.setMinHeight(CELL_HEIGHT); tv.setMinWidth(CELL_WIDTH);
+        tv.setGravity(Gravity.CENTER); tv.setTextSize(16);
         tv.setBackgroundColor(ContextCompat.getColor(this, R.color.break_background));
-        tv.setBackgroundResource(R.drawable.cell_box);
-        return tv;
+        tv.setBackgroundResource(R.drawable.cell_box); return tv;
     }
-
-    private AppCompatTextView createEmptyCell() {
-        AppCompatTextView tv = new AppCompatTextView(this);
-        tv.setText("—");
-        tv.setMinHeight(CELL_HEIGHT);
-        tv.setMinWidth(CELL_WIDTH);
-        tv.setGravity(Gravity.CENTER);
-        tv.setTextColor(ContextCompat.getColor(this, android.R.color.darker_gray));
-        tv.setBackgroundResource(R.drawable.cell_box);
-        return tv;
-    }
-
     private void printTimetable() {
-        PrintManager printManager = (PrintManager) getSystemService(Context.PRINT_SERVICE);
-        printManager.print("Timetable_" + selectedBatch,
-                new TimetablePrintDocumentAdapter(this, tableLayout, selectedBatch, selectedSection, selectedAcademicYear),
-                null
-        );
+        PrintManager pm = (PrintManager) getSystemService(Context.PRINT_SERVICE);
+        pm.print("Timetable_" + selectedBatch, new TimetablePrintDocumentAdapter(this, tableLayout, selectedBatch, selectedSection, selectedAcademicYear), null);
     }
 }

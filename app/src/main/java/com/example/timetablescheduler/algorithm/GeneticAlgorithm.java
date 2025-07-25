@@ -125,6 +125,7 @@ public class GeneticAlgorithm {
         Map<String, Set<String>> batchSchedule = new HashMap<>();
         Map<String, Integer> subjectClassCount = new HashMap<>();
 
+        // Standard constraints: teacher/batch double booking, subject lecture/lab matches, teacher loads, etc
         for (TimetableClass cls : individual.getClasses()) {
             TimeSlot ts = cls.getTimeSlot();
             String teacherKey = cls.getTeacher();
@@ -180,6 +181,36 @@ public class GeneticAlgorithm {
             }
         }
 
+        // === LAB CONSTRAINT FOR BATCHES ===
+        // For each batch, all labs (any subject) must be on different days, and all labs at the same time slot
+        Map<String, List<TimetableClass>> batchLabs = new HashMap<>();
+        for (TimetableClass cls : individual.getClasses()) {
+            if (cls.isLab() && cls.getTimeSlot() != null) {
+                batchLabs.computeIfAbsent(cls.getBatch(), k -> new ArrayList<>()).add(cls);
+            }
+        }
+
+        for (Map.Entry<String, List<TimetableClass>> entry : batchLabs.entrySet()) {
+            List<TimetableClass> labs = entry.getValue();
+            Set<String> days = new HashSet<>();
+            Set<Integer> periods = new HashSet<>();
+            for (TimetableClass lab : labs) {
+                days.add(String.valueOf(lab.getTimeSlot().getDay())); // <-- FIXED HERE!
+                periods.add(lab.getTimeSlot().getPeriod());
+            }
+            // 1. Labs for this batch must be on different days
+            if (days.size() < labs.size()) {
+                conflicts += (labs.size() - days.size());
+            }
+            totalConstraints++;
+
+            // 2. Labs for this batch must be at same period
+            if (periods.size() > 1) {
+                conflicts += (periods.size() - 1) * 2; // Stronger penalty
+            }
+            totalConstraints++;
+        }
+
         return (totalConstraints == 0) ? 1.0 : Math.max(0, 1.0 - (double) conflicts / totalConstraints);
     }
 
@@ -195,7 +226,6 @@ public class GeneticAlgorithm {
         return population.get(0);
     }
 
-    // Always keep teacher as originally assigned
     private Individual crossover(Individual parent1, Individual parent2, List<TimetableClass> originalClasses) {
         Individual child = new Individual();
         List<TimetableClass> childClasses = new ArrayList<>();
@@ -218,7 +248,6 @@ public class GeneticAlgorithm {
         return child;
     }
 
-    // Never mutate teacher, always use original assigned
     private void mutate(Individual individual, List<TimetableClass> originalClasses) {
         Random random = new Random();
         for (int i = 0; i < individual.getClasses().size(); i++) {
