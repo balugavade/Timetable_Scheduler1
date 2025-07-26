@@ -73,15 +73,12 @@ public class FacultyDashboardActivity extends AppCompatActivity {
             timetableList.addAll(timetables);
             periodTimesMap.clear();
 
-            // --- Fetch period slots for all approved timetables ---
-            // We'll count here and trigger next step once ALL configs fetched (async!)
             final int[] configsFetched = {0};
             for (ParseObject timetable : timetableList) {
                 String timetableId = timetable.getObjectId();
 
-                // You may need to adapt this query to match your schema - e.g., match on "user", "batch", or "config" pointer!
                 ParseQuery<ParseObject> configQuery = ParseQuery.getQuery("TimetableConfig");
-                configQuery.whereEqualTo("user", timetable.getParseUser("user")); // adapt if needed!
+                configQuery.whereEqualTo("user", timetable.getParseUser("user"));
                 configQuery.orderByDescending("createdAt");
                 configQuery.setLimit(1);
                 configQuery.include("periods");
@@ -101,18 +98,15 @@ public class FacultyDashboardActivity extends AppCompatActivity {
                         }
                         periodTimesMap.put(timetableId, slots);
                     }
-                    // after all configs fetched (or failed), now fetch classes
                     if (configsFetched[0] == timetableList.size()) {
-                        fetchAndSetupTeacherSpinner(timetables); // only continue after periodTimesMap populated
+                        fetchAndSetupTeacherSpinner(timetables);
                     }
                 });
             }
         });
     }
 
-    // Helper: Build unique teacher list after fetching periods/timings
     private void fetchAndSetupTeacherSpinner(List<ParseObject> timetables) {
-        // Fetch teacher names from all TimetableEntry objects
         List<ParseQuery<ParseObject>> subQueries = new ArrayList<>();
         for (ParseObject timetable : timetables) {
             ParseQuery<ParseObject> entryQuery = ParseQuery.getQuery("TimetableEntry");
@@ -139,7 +133,6 @@ public class FacultyDashboardActivity extends AppCompatActivity {
         });
     }
 
-    // Step 2: Show spinner for teachers, on selection: show their classes from all approved timetables
     private void setupTeacherSpinner() {
         spinnerAdapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item, teacherNames);
         spinnerAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
@@ -160,7 +153,6 @@ public class FacultyDashboardActivity extends AppCompatActivity {
         });
     }
 
-    // Step 3: Find timetable entries for selected teacher, from all approved timetables
     private void loadFacultyClasses(String teacherName) {
         List<ParseQuery<ParseObject>> queries = new ArrayList<>();
         for (ParseObject timetable : timetableList) {
@@ -177,7 +169,6 @@ public class FacultyDashboardActivity extends AppCompatActivity {
         mainQuery.findInBackground((entries, err) -> {
             if (err == null && entries != null && !entries.isEmpty()) {
                 List<MergedEntry> merged = mergeLabPeriods(entries);
-                // Sort by week order
                 merged.sort(Comparator.comparingInt(e -> WEEK_ORDER.indexOf(e.day)));
                 runOnUiThread(() -> {
                     showTable(merged);
@@ -196,9 +187,10 @@ public class FacultyDashboardActivity extends AppCompatActivity {
         String subject;
         String batch;
         String section;
-        String timetableId; // NEW
+        String timetableId;
+        boolean isLab;  // Added to indicate if it is a lab class
 
-        MergedEntry(String day, int startPeriod, int endPeriod, String subject, String batch, String section, String timetableId) {
+        MergedEntry(String day, int startPeriod, int endPeriod, String subject, String batch, String section, String timetableId, boolean isLab) {
             this.day = day;
             this.startPeriod = startPeriod;
             this.endPeriod = endPeriod;
@@ -206,6 +198,7 @@ public class FacultyDashboardActivity extends AppCompatActivity {
             this.batch = batch;
             this.section = section;
             this.timetableId = timetableId;
+            this.isLab = isLab;
         }
     }
 
@@ -247,7 +240,7 @@ public class FacultyDashboardActivity extends AppCompatActivity {
                     break;
                 }
             }
-            mergedList.add(new MergedEntry(day, period, endPeriod, subject, batch, section, timetableId));
+            mergedList.add(new MergedEntry(day, period, endPeriod, subject, batch, section, timetableId, isLab));
             i++;
         }
         return mergedList;
@@ -258,7 +251,7 @@ public class FacultyDashboardActivity extends AppCompatActivity {
 
         TableRow header = new TableRow(this);
         addCell(header, "Day", true);
-        addCell(header, "Timing", true); // Will have start/end time!
+        addCell(header, "Timing", true);
         addCell(header, "Subject", true);
         addCell(header, "Batch/Class", true);
         addCell(header, "Section", true);
@@ -267,10 +260,17 @@ public class FacultyDashboardActivity extends AppCompatActivity {
         for (MergedEntry me : entries) {
             TableRow row = new TableRow(this);
             addCell(row, me.day, false);
-            // Here’s the actual timing, not just "Period 1"
+
             String timingText = getTimingForEntry(me.timetableId, me.startPeriod, me.endPeriod);
             addCell(row, timingText, false);
-            addCell(row, me.subject, false);
+
+            // Append " (Lab)" if this entry is a lab
+            String subjectDisplay = me.subject;
+            if (me.isLab) {
+                subjectDisplay += " (Lab)";
+            }
+            addCell(row, subjectDisplay, false);
+
             addCell(row, me.batch, false);
             addCell(row, me.section, false);
             tableLayout.addView(row);
@@ -282,10 +282,8 @@ public class FacultyDashboardActivity extends AppCompatActivity {
         if (slots == null || slots.isEmpty()) return "-";
         int startIdx = Math.max(0, startPeriod - 1);
         int endIdx = Math.max(0, endPeriod - 1);
-        if (startIdx >= slots.size() || endIdx >= slots.size())
-            return "-";
+        if (startIdx >= slots.size() || endIdx >= slots.size()) return "-";
         String st = slots.get(startIdx)[0], et = slots.get(endIdx)[1];
-        // You can prettify formatting here if needed
         return st + " - " + et;
     }
 
