@@ -2,6 +2,7 @@ package com.example.timetablescheduler;
 
 import android.app.AlertDialog;
 import android.content.Context;
+import android.content.Intent;
 import android.os.Bundle;
 import android.print.PrintManager;
 import android.view.Gravity;
@@ -42,7 +43,12 @@ public class TimetableDisplayActivity extends AppCompatActivity {
         saveButton = findViewById(R.id.saveButton);
 
         printButton.setOnClickListener(v -> printTimetable());
-        exitButton.setOnClickListener(v -> finish());
+        exitButton.setOnClickListener(v -> {
+            Intent intent = new Intent(TimetableDisplayActivity.this, WelcomeActivity.class);
+            intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_NEW_TASK); // Optional, clears back stack
+            startActivity(intent);
+            finish();
+        });
         saveButton.setOnClickListener(v -> saveManualEdits());
         loadBatchListWithTimetables();
     }
